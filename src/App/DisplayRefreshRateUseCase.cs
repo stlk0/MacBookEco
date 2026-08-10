@@ -63,7 +63,7 @@ namespace MacBookEco.App
             {
                 return OptimizationActionResult.Unsupported(
                     OperationCode.InvalidRequest,
-                    "Only the reviewed 48 Hz and native 60 Hz modes are allowed.");
+                    "Only the app-owned 48 Hz and native 60 Hz modes are allowed.");
             }
 
             try
@@ -86,7 +86,7 @@ namespace MacBookEco.App
                 {
                     return OptimizationActionResult.Unsupported(
                         OperationCode.UnsupportedCapability,
-                        "The current refresh rate is not a reviewed 48/60 Hz "
+                        "The current refresh rate is not an app-owned 48/60 Hz "
                         + "watchdog recovery target.");
                 }
 
@@ -98,6 +98,18 @@ namespace MacBookEco.App
                         + " Hz.",
                         OperationCode.None,
                         false);
+                }
+
+                if (refreshRateHz == 48 &&
+                    !_displayModes.IsExactRefreshOnlyModeAvailable(
+                        displayTarget.Endpoint.GdiDeviceName,
+                        60))
+                {
+                    return OptimizationActionResult.Unsupported(
+                        OperationCode.UnsupportedCapability,
+                        "Windows has not exposed an exact native 60 Hz recovery "
+                            + "mode for the current display settings. No temporary "
+                            + "48 Hz mode was applied.");
                 }
 
                 if (!_displayModes.IsExactRefreshOnlyModeAvailable(

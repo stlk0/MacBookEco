@@ -140,6 +140,14 @@ namespace MacBookEco.App
 
         private static string PublicProfileId(string value)
         {
+            if (string.Equals(
+                    value,
+                    "Experimental local 48 Hz candidate",
+                    StringComparison.Ordinal))
+            {
+                return value;
+            }
+
             DisplayProfile profile = ProfileCatalog.GetById(value);
             return profile == null ? "N/A" : profile.Id;
         }

@@ -37,6 +37,10 @@ namespace MacBookEco.App
             bool recoverable = notInstalled || restored;
             bool ready = installed
                 && optimizationState.Display48HzAvailable;
+            bool candidateEligible = optimizationState != null
+                && optimizationState.DisplayCandidateEligible;
+            bool experimental = optimizationState != null
+                && optimizationState.DisplayProfileExperimental;
 
             DisplaySupportUiState result = new DisplaySupportUiState();
             result.CanSelect48Hz = mutationControlsEnabled && ready;
@@ -47,7 +51,9 @@ namespace MacBookEco.App
             result.CanRemove = mutationControlsEnabled && installed;
             result.InstallText = installed || conflict
                 ? "Repair 48 Hz support"
-                : "Install 48 Hz support";
+                : (experimental
+                    ? "Install experimental 48 Hz profile"
+                    : "Install 48 Hz support");
             // Re-running the install action for an owned profile is a safe
             // read-back repair: the elevated service reconciles the exact
             // owned bytes and never overwrites a foreign override.  A fresh
@@ -55,7 +61,8 @@ namespace MacBookEco.App
             // active, because that is not ours to modify.
             result.CanInstall = mutationControlsEnabled
                 && stateAvailable
-                && (ready || conflict || (recoverable && !current48Hz));
+                && (ready || conflict ||
+                    (recoverable && !current48Hz && candidateEligible));
             result.SupportText = SupportText(
                 stateAvailable,
                 installed,
@@ -63,7 +70,12 @@ namespace MacBookEco.App
                 notInstalled,
                 restored,
                 current48Hz,
-                state);
+                state,
+                experimental,
+                optimizationState == null
+                    ? string.Empty
+                    : optimizationState.DisplayCandidateSummary,
+                candidateEligible);
             return result;
         }
 
@@ -74,7 +86,10 @@ namespace MacBookEco.App
             bool notInstalled,
             bool restored,
             bool current48Hz,
-            string state)
+            string state,
+            bool experimental,
+            string candidateSummary,
+            bool candidateEligible)
         {
             if (!stateAvailable)
             {
@@ -83,24 +98,59 @@ namespace MacBookEco.App
 
             if (installed)
             {
-                return ready
-                    ? "48 Hz support is installed by MacBook Eco."
-                    : "48 Hz support is installed, but Windows has not exposed "
-                        + "the mode yet. Restart Windows to activate 48 Hz.";
+                string installedText = experimental
+                    ? "Experimental 48 Hz profile is installed by MacBook Eco; "
+                        + "it is not hardware verified."
+                    : "48 Hz support is installed by MacBook Eco.";
+                string result = ready
+                    ? installedText
+                    : installedText + " Windows has not exposed the mode yet. "
+                        + "Restart Windows to activate 48 Hz.";
+                return experimental
+                    ? AppendCandidateSummary(result, candidateSummary)
+                    : result;
             }
 
             if (restored)
             {
-                return current48Hz
-                    ? "48 Hz support was removed. Restart Windows to finish removal."
-                    : "48 Hz support is not installed.";
+                if (current48Hz)
+                {
+                    return
+                        "48 Hz support was removed. Restart Windows to finish removal.";
+                }
+
+                if (experimental)
+                {
+                    return candidateEligible
+                        ? AppendCandidateSummary(
+                            "Experimental 48 Hz candidate — not hardware verified.",
+                            candidateSummary)
+                        : "The experimental 48 Hz candidate is not eligible "
+                            + "for installation in the current state.";
+                }
+
+                return "48 Hz support is not installed.";
             }
 
             if (notInstalled)
             {
-                return current48Hz
-                    ? "48 Hz is active from external support. MacBook Eco will not modify it."
-                    : "48 Hz support is not installed.";
+                if (current48Hz)
+                {
+                    return
+                        "48 Hz is active from external support. MacBook Eco will not modify it.";
+                }
+
+                if (experimental)
+                {
+                    return candidateEligible
+                        ? AppendCandidateSummary(
+                            "Experimental 48 Hz candidate — not hardware verified.",
+                            candidateSummary)
+                        : "The experimental 48 Hz candidate is not eligible "
+                            + "for installation in the current state.";
+                }
+
+                return "48 Hz support is not installed.";
             }
 
             if (IsState(state, "RecoveryRequired"))
@@ -115,6 +165,13 @@ namespace MacBookEco.App
             }
 
             return "48 Hz support status is unavailable.";
+        }
+
+        private static string AppendCandidateSummary(string text, string summary)
+        {
+            return string.IsNullOrWhiteSpace(summary)
+                ? text
+                : text + " " + summary.Trim();
         }
 
         private static bool IsState(string value, string expected)

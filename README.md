@@ -2,7 +2,8 @@
 
 MacBook Eco is a small Windows tray utility for Intel MacBooks running Windows
 through Boot Camp. It can reduce heat and idle power use with a reviewed 48 Hz
-display mode and reversible CPU power presets.
+display mode, a restricted local experimental generator, and reversible CPU
+power presets.
 
 It is a native WinForms application for .NET Framework 4.8. It has no service,
 kernel driver, bundled runtime, analytics, or network access.
@@ -15,15 +16,22 @@ kernel driver, bundled runtime, analytics, or network access.
 - internal panel `APPA044`;
 - AMD Radeon Pro 5300M.
 
-Display changes require an exact hardware match. Other machines remain
-diagnostic-only. See [supported hardware](SUPPORTED_HARDWARE.md) for the full
-profile and tested driver.
+The reviewed display profile requires an exact hardware match and retains
+priority over generation. The research catalog covers Intel MacBooks with
+discrete AMD and NVIDIA GPUs, while the executable generator currently allows
+only two exact 16-inch AMD model/device pairs. MacBook Eco may offer a locally
+calculated experimental 48 Hz candidate only after every hardware, EDID,
+adapter, override, and topology check succeeds. A generated candidate is not
+supported, verified, or known safe on that panel. See
+[supported hardware](SUPPORTED_HARDWARE.md) and the
+[research catalog](docs/INTEL_DGPU_MACBOOK_CATALOG.md).
 
 ## Features
 
 - guarded switching between 48 and 60 Hz with confirmation and automatic
   rollback;
-- installation and removal of the reviewed 48 Hz display profile;
+- installation and removal of an exact reviewed or eligible experimental 48 Hz
+  display profile;
 - three reversible CPU presets in an application-owned Windows power plan;
 - battery, CPU, display, and read-only GPU telemetry;
 - five-minute graphs while the dashboard is open;
@@ -38,16 +46,27 @@ driver.
 ## Install and use
 
 1. Run `MacBookEco-<version>-win-x64-setup.exe` and launch MacBook Eco.
-2. On the supported machine, select **Install 48 Hz support**, approve UAC, and
-   restart Windows.
-3. Select **48 Hz**. Confirm the mode after checking the picture; otherwise the
-   application and its watchdog restore the previous mode.
+2. Select **Install 48 Hz support**. For an experimental candidate, first review
+   the model, panel ID, native timing, and calculated timing, then explicitly
+   acknowledge the separate display-risk warning. Declining it launches no
+   helper and changes nothing. Approve UAC only after that step, then restart
+   Windows.
+3. After restart, verify that native **60 Hz** is still available. MacBook Eco
+   never selects a generated 48 Hz mode automatically. Select **48 Hz** manually
+   and confirm only after checking the picture; otherwise the application and
+   its watchdog restore the complete previous mode on the same physical panel.
 4. Choose a CPU preset if wanted. The application shows its values before it is
    applied and stores it in a separate MacBook Eco power plan.
 5. Enable **Start with Windows** from the tray menu if needed.
 
-Installing display support and selecting 48 Hz are separate operations. MacBook
-Eco never removes an EDID override created by another tool.
+Installing display support and selecting 48 Hz are separate operations. The
+elevated helper receives one of two fixed commands: the argument-free
+`install-display` for reviewed profiles, or `install-experimental-display` with
+one canonical 64-hex comparison token after the separate risk acknowledgement.
+The token binds that acknowledgement to the candidate shown by the UI; it cannot
+select a timing, monitor, path, or EDID bytes. The helper independently
+revalidates or regenerates the selected profile kind from fresh hardware data.
+MacBook Eco never removes an EDID override created by another tool.
 
 The included profiles are:
 
@@ -131,7 +150,11 @@ release as signed without verifying its Authenticode signatures.
 
 ## Limitations
 
-- Only the listed MacBook, panel, and GPU combination supports display changes.
+- Only the listed exact MacBook, panel, and GPU combination has a reviewed
+  display profile. Eligible generated candidates remain experimental and
+  unverified on hardware.
+- External displays, Apple Silicon, ordinary PC laptops, and integrated-only
+  graphics are outside the experimental generator scope.
 - GPU clocks, voltage, and fans are not changed.
 - Sensor coverage depends on the installed Windows and AMD drivers.
 - The interface is currently English.

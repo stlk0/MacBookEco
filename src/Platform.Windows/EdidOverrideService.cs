@@ -35,12 +35,42 @@ namespace MacBookEco.Platform.Windows
 
         public EdidOverrideOperationResult InstallVerifiedProfile()
         {
+            return InstallProfile(DisplayProfileKind.Verified, null);
+        }
+
+        public EdidOverrideOperationResult InstallExperimentalProfile(
+            string acknowledgementToken)
+        {
+            Sha256Digest parsed;
+            if (!Sha256Digest.TryParseCanonical(
+                    acknowledgementToken,
+                    out parsed))
+            {
+                throw new NotSupportedException(
+                    "The experimental install requires one canonical "
+                        + "acknowledgement token.");
+            }
+
+            return InstallProfile(
+                DisplayProfileKind.Experimental,
+                parsed.ToString());
+        }
+
+        private EdidOverrideOperationResult InstallProfile(
+            DisplayProfileKind expectedKind,
+            string acknowledgementToken)
+        {
             PrivilegeGuard.RequireAdministrator();
             using (JournalStore journals = JournalStore.OpenEdidMutation())
             {
                 EdidJournal journal = journals.ReadEdid();
                 if (journal != null)
                 {
+                    ValidateInstallCommandForJournal(
+                        journal,
+                        expectedKind,
+                        acknowledgementToken);
+
                     if (journal.State == EdidJournalState.RestorePending)
                     {
                         // Every command reconciles an interrupted operation
@@ -58,11 +88,19 @@ namespace MacBookEco.Platform.Windows
                         journal.State == EdidJournalState.Installed ||
                         journal.State == EdidJournalState.Conflict)
                     {
+                        ValidateInstallCommandForJournal(
+                            journal,
+                            expectedKind,
+                            acknowledgementToken);
                         return ReconcileInstall(journals, journal);
                     }
                 }
 
-                return BeginNewInstall(journals, journal);
+                return BeginNewInstall(
+                    journals,
+                    journal,
+                    expectedKind,
+                    acknowledgementToken);
             }
         }
 
@@ -93,29 +131,77 @@ namespace MacBookEco.Platform.Windows
 
         private EdidOverrideOperationResult BeginNewInstall(
             JournalStore journals,
-            EdidJournal previous)
+            EdidJournal previous,
+            DisplayProfileKind expectedKind,
+            string acknowledgementToken)
         {
             WindowsHardwareSnapshot snapshot = discovery.Discover();
             HardwareSnapshot hardware = snapshot.ToCoreSnapshot();
-            ProfileSelectionResult selection = ProfileCatalog.Select(hardware);
-            DisplayProfile profile = selection.Profile;
-            ValidateInstallPreconditions(snapshot, hardware, profile);
-
-            ResolvedMonitorTarget target = targetResolver.ResolveActive();
-            ValidateActiveTarget(snapshot, hardware, target);
-
-            // The pre-intent comparison proves that a new operation cannot
-            // take ownership of an existing or incorrectly typed value.
-            if (target.ReadOverride() != null)
+            DisplayProfile profile = SelectReviewedProfile(hardware);
+            ResolvedMonitorTarget target;
+            if (profile == null)
             {
-                throw new InvalidOperationException(
-                    "A pre-existing EDID override was found. MacBook Eco will not merge or overwrite it.");
+                if (expectedKind != DisplayProfileKind.Experimental)
+                {
+                    throw new NotSupportedException(
+                        "No reviewed display profile matches this hardware.");
+                }
+
+                // Generation is deliberately last: every platform, topology,
+                // full-document and ownership gate is proven first.
+                ValidateExperimentalGenerationPlatformPreconditions(
+                    snapshot,
+                    hardware);
+                target = targetResolver.ResolveActive();
+                ValidateActiveTarget(snapshot, hardware, target);
+                ValidateExperimentalSourceDocument(hardware, target);
+                RequireAbsentOverride(target);
+
+                ExperimentalProfileGenerationResult generated =
+                    Experimental48HzProfileGenerator.GenerateFallback(hardware);
+                if (!generated.Succeeded)
+                {
+                    throw new NotSupportedException(
+                        "No experimental 48 Hz profile passes every generation gate.");
+                }
+
+                profile = generated.Profile;
             }
+            else
+            {
+                if (expectedKind != DisplayProfileKind.Verified)
+                {
+                    throw new NotSupportedException(
+                        "A reviewed profile has priority over experimental generation.");
+                }
+
+                target = targetResolver.ResolveActive();
+                ValidateActiveTarget(snapshot, hardware, target);
+                RequireAbsentOverride(target);
+            }
+
+            if (profile.Kind != expectedKind)
+            {
+                throw new SecureStateConflictException(
+                    "The fixed Admin command does not match the selected profile kind.");
+            }
+
+            if (profile.IsExperimental)
+            {
+                RequireExperimentalAcknowledgement(
+                    profile.Id,
+                    acknowledgementToken);
+            }
+
+            ValidateInstallPreconditions(snapshot, hardware, profile);
 
             byte[] expectedOverride = CompileOwnedOverride(profile, target);
             EdidJournalPayload payload = new EdidJournalPayload(
                 target.CreateIdentity(profile.Id),
-                Sha256Digest.Compute(expectedOverride));
+                Sha256Digest.Compute(expectedOverride),
+                profile.IsExperimental
+                    ? profile.SourceEdidSignature
+                    : null);
             DateTime now = DateTime.UtcNow;
             EdidJournal intent = new EdidJournal(
                 JournalOperationId.NewId(),
@@ -183,7 +269,9 @@ namespace MacBookEco.Platform.Windows
             {
                 case EdidReconciliationAction.ConfirmInstalled:
                     return EdidOverrideOperationResult.Success(
-                        "The verified display override is already installed.",
+                        IsExperimental(journal)
+                            ? "The experimental local display override is already installed."
+                            : "The reviewed display override is already installed.",
                         journal.Payload.Target.ProfileId,
                         true);
 
@@ -196,6 +284,12 @@ namespace MacBookEco.Platform.Windows
                     // met (for example, an external display is attached).
                     // It is not evidence that the durable identity or owned
                     // bytes are foreign, so do not convert it to Conflict.
+                    if (context.Profile.IsExperimental)
+                    {
+                        ValidateExperimentalSourceDocument(
+                            context.Hardware,
+                            context.Target);
+                    }
                     ValidateInstallMutationPreconditions(
                         context.Snapshot,
                         context.Hardware,
@@ -205,7 +299,10 @@ namespace MacBookEco.Platform.Windows
                         // The resolver repeats compare-before-write and exact
                         // read-back through a newly proven SetupAPI devnode.
                         context.Target.WriteOwnedOverride(
-                            context.ExpectedOverride);
+                            context.ExpectedOverride,
+                            context.Profile.IsExperimental
+                                ? context.Profile.SourceEdidSignature
+                                : null);
                         if (context.Target.ClassifyOverride(
                                 context.ExpectedOverride) !=
                             EdidLiveOverrideState.ExactOwned)
@@ -362,16 +459,12 @@ namespace MacBookEco.Platform.Windows
         private InstallContext ResolveInstallContext(EdidJournal journal)
         {
             RequirePayload(journal);
-            DisplayProfile profile = ProfileCatalog.GetById(
-                journal.Payload.Target.ProfileId);
-            if (profile == null)
-            {
-                throw new SecureStateConflictException(
-                    "The journal references no compiled display profile.");
-            }
-
             WindowsHardwareSnapshot snapshot = discovery.Discover();
             HardwareSnapshot hardware = snapshot.ToCoreSnapshot();
+            DisplayProfile profile = ResolveActiveProfile(
+                journal.Payload.Target.ProfileId,
+                hardware,
+                journal.Payload.SourceEdidSignature);
             ValidateInstallHardware(hardware, profile);
 
             ResolvedMonitorTarget target = targetResolver.ResolveActive();
@@ -383,6 +476,8 @@ namespace MacBookEco.Platform.Windows
                 throw new SecureStateConflictException(
                     "The active internal display no longer matches the durable EDID identity.");
             }
+
+            ValidateRecoverySourceDocument(journal, target);
 
             byte[] expectedOverride = CompileOwnedOverride(profile, target);
             VerifyJournaledOwnershipHash(journal, expectedOverride);
@@ -397,14 +492,6 @@ namespace MacBookEco.Platform.Windows
         private RestoreContext ResolveRestoreContext(EdidJournal journal)
         {
             RequirePayload(journal);
-            DisplayProfile profile = ProfileCatalog.GetById(
-                journal.Payload.Target.ProfileId);
-            if (profile == null)
-            {
-                throw new SecureStateConflictException(
-                    "The journal references no compiled display profile.");
-            }
-
             // This resolver has no active CCD/GDI dependency.  It enumerates
             // monitor-class devnodes, including non-present devices, and
             // independently proves every durable monitor field first.
@@ -419,10 +506,137 @@ namespace MacBookEco.Platform.Windows
                     "The re-resolved monitor does not match the durable EDID identity.");
             }
 
+            ValidateRecoverySourceDocument(journal, target);
+
+            DisplayProfile profile = ResolveRestoreProfile(
+                journal.Payload.Target.ProfileId,
+                target,
+                journal.Payload.SourceEdidSignature);
             ValidateRestoreProfile(profile, target);
             byte[] expectedOverride = CompileOwnedOverride(profile, target);
             VerifyJournaledOwnershipHash(journal, expectedOverride);
             return new RestoreContext(target, expectedOverride);
+        }
+
+        private static DisplayProfile SelectReviewedProfile(
+            HardwareSnapshot hardware)
+        {
+            if (hardware == null ||
+                !hardware.Edid.IsDetailedTimingDescriptor(0))
+            {
+                return null;
+            }
+
+            ProfileSelectionResult selection = ProfileCatalog.Select(hardware);
+            return selection.HardwareSupported ? selection.Profile : null;
+        }
+
+        private static void ValidateExperimentalGenerationPlatformPreconditions(
+            WindowsHardwareSnapshot snapshot,
+            HardwareSnapshot hardware)
+        {
+            if (snapshot == null || snapshot.InternalDisplay == null ||
+                string.IsNullOrEmpty(snapshot.InternalDisplay.DeviceInstanceId))
+            {
+                throw new InvalidOperationException(
+                    "The active internal display could not be mapped to its monitor devnode.");
+            }
+
+            if (snapshot.ActiveDisplayCount != 1)
+            {
+                throw new InvalidOperationException(
+                    "Experimental generation requires one active internal display.");
+            }
+
+            if (snapshot.CurrentDisplayMode == null ||
+                snapshot.CurrentDisplayMode.RefreshRate != 60)
+            {
+                throw new InvalidOperationException(
+                    "Experimental generation requires the native 60 Hz desktop mode.");
+            }
+
+            if (!snapshot.InternalDisplay.ExistingEdidOverrideReadSucceeded ||
+                snapshot.InternalDisplay.ExistingEdidOverride != null)
+            {
+                throw new InvalidOperationException(
+                    "Experimental generation requires a proven absent EDID override.");
+            }
+
+            if (hardware == null || !hardware.CompleteEdidIsValid ||
+                hardware.NormalizedSourceEdidSignature == null)
+            {
+                throw new InvalidOperationException(
+                    "Experimental generation requires a valid complete EDID document.");
+            }
+        }
+
+        private static void RequireAbsentOverride(ResolvedMonitorTarget target)
+        {
+            if (target == null || target.ReadOverride() != null)
+            {
+                throw new InvalidOperationException(
+                    "A pre-existing EDID override was found. MacBook Eco will not "
+                        + "merge or overwrite it.");
+            }
+        }
+
+        private static void ValidateExperimentalSourceDocument(
+            HardwareSnapshot hardware,
+            ResolvedMonitorTarget target)
+        {
+            if (hardware == null ||
+                hardware.NormalizedSourceEdidSignature == null ||
+                target == null ||
+                !EdidBaseBlock.HasValidCompleteDocument(target.SourceEdid) ||
+                !hardware.NormalizedSourceEdidSignature.Equals(
+                    EdidBaseBlock.ComputeNormalizedDocumentSignature(
+                        target.SourceEdid)))
+            {
+                throw new SecureStateConflictException(
+                    "Discovery and SetupAPI do not expose the same valid complete EDID document.");
+            }
+        }
+
+        private static void ValidateRecoverySourceDocument(
+            EdidJournal journal,
+            ResolvedMonitorTarget target)
+        {
+            if (!IsExperimental(journal))
+            {
+                return;
+            }
+
+            if (journal.Payload.SourceEdidSignature == null || target == null)
+            {
+                throw new SecureStateConflictException(
+                    "The experimental journal lacks its source EDID identity.");
+            }
+
+            byte[] sourceEdid = target.SourceEdid;
+            if (EdidBaseBlock.HasValidCompleteDocument(sourceEdid))
+            {
+                if (!journal.Payload.SourceEdidSignature.Equals(
+                        EdidBaseBlock.ComputeNormalizedDocumentSignature(
+                            sourceEdid)))
+                {
+                    throw new SecureStateConflictException(
+                        "The complete source EDID no longer matches the experimental journal.");
+                }
+
+                return;
+            }
+
+            // Windows may replace the devnode EDID view with the exact owned
+            // 128-byte base after reboot. Only that already-owned identity is
+            // a safe fallback for recovery; it never authorizes a fresh write.
+            if (sourceEdid == null ||
+                sourceEdid.Length != EdidBaseBlock.Length ||
+                !target.BaseEdidHash.Equals(
+                    journal.Payload.OwnedOverrideHash))
+            {
+                throw new SecureStateConflictException(
+                    "The complete source EDID cannot be re-proven for recovery.");
+            }
         }
 
         private static void ValidateInstallPreconditions(
@@ -441,14 +655,16 @@ namespace MacBookEco.Platform.Windows
             if (profile == null)
             {
                 throw new NotSupportedException(
-                    "No reviewed display profile matches this Mac, panel, EDID and adapter.");
+                    "No reviewed or experimental display profile matches this "
+                        + "Mac, panel, EDID and controlling adapter.");
             }
 
             DisplayProfileMatch match = profile.Match(hardware);
             if (!match.HardwareSupported)
             {
                 throw new NotSupportedException(
-                    "The discovered hardware no longer matches the reviewed display profile.");
+                    "The discovered hardware no longer matches the selected "
+                        + "display profile.");
             }
         }
 
@@ -470,11 +686,49 @@ namespace MacBookEco.Platform.Windows
                     "Disconnect external displays before installing a panel override.");
             }
 
+            if (profile.IsExperimental &&
+                !snapshot.InternalDisplay.ExistingEdidOverrideReadSucceeded)
+            {
+                throw new InvalidOperationException(
+                    "The current EDID override state could not be read safely.");
+            }
+
+            if (profile.IsExperimental &&
+                snapshot.InternalDisplay.ExistingEdidOverride != null)
+            {
+                throw new InvalidOperationException(
+                    "A pre-existing EDID override was found. MacBook Eco will not "
+                        + "merge or overwrite it.");
+            }
+
             if (snapshot.CurrentDisplayMode == null ||
                 snapshot.CurrentDisplayMode.RefreshRate != 60)
             {
                 throw new InvalidOperationException(
                     "Installation requires the current desktop mode to be at 60 Hz.");
+            }
+
+            if (profile.IsExperimental && !hardware.CompleteEdidIsValid)
+            {
+                throw new InvalidOperationException(
+                    "The complete EDID document is not valid for an experimental install.");
+            }
+
+            if (profile.IsExperimental &&
+                (hardware.NormalizedSourceEdidSignature == null ||
+                 !hardware.NormalizedSourceEdidSignature.Equals(
+                     profile.SourceEdidSignature)))
+            {
+                throw new InvalidOperationException(
+                    "The complete source EDID no longer matches the experimental profile.");
+            }
+
+            if (profile.IsExperimental &&
+                hardware.Edid.ContainsDetailedTiming(profile.TargetTiming))
+            {
+                throw new InvalidOperationException(
+                    "The generated target already exists in the base EDID, so "
+                        + "MacBook Eco cannot establish fresh ownership.");
             }
 
             DisplayProfileMatch match = profile.Match(hardware);
@@ -506,6 +760,9 @@ namespace MacBookEco.Platform.Windows
                     hardware.PanelHardwareId,
                     target.HardwareId,
                     StringComparison.Ordinal) ||
+                snapshot.InternalDisplay.Endpoint == null ||
+                target.Endpoint == null ||
+                !snapshot.InternalDisplay.Endpoint.Equals(target.Endpoint) ||
                 !FixedTimeComparer.AreEqual(
                     hardware.Edid.ToByteArray(),
                     target.BaseEdid))
@@ -574,8 +831,13 @@ namespace MacBookEco.Platform.Windows
                     journal.Generation.Next(),
                     DateTime.UtcNow));
                 return EdidOverrideOperationResult.Success(
-                    "The verified 48 Hz descriptor was installed. " +
-                    "A display-adapter reload or reboot is required before the mode appears.",
+                    IsExperimental(journal)
+                        ? "The experimental local 48 Hz descriptor was installed. "
+                            + "A display-adapter reload or reboot is required before "
+                            + "the mode appears."
+                        : "The reviewed 48 Hz descriptor was installed. "
+                            + "A display-adapter reload or reboot is required before "
+                            + "the mode appears.",
                     installed.Payload.Target.ProfileId,
                     true);
             }
@@ -590,6 +852,132 @@ namespace MacBookEco.Platform.Windows
                     "journal state could not be saved. Run recovery before another display change.",
                     journal.Payload.Target.ProfileId,
                     true);
+            }
+        }
+
+        private static DisplayProfile ResolveActiveProfile(
+            string profileId,
+            HardwareSnapshot hardware,
+            Sha256Digest persistedSourceEdidSignature)
+        {
+            DisplayProfile reviewed = ProfileCatalog.GetById(profileId);
+            if (reviewed != null)
+            {
+                return reviewed;
+            }
+
+            if (hardware == null || !string.Equals(
+                    hardware.SystemManufacturer,
+                    "Apple Inc.",
+                    StringComparison.Ordinal))
+            {
+                throw new SecureStateConflictException(
+                    "The experimental profile cannot re-prove exact Apple SMBIOS identity.");
+            }
+
+            ExperimentalProfileGenerationResult generated =
+                Experimental48HzProfileGenerator.ResolveForRecovery(
+                    profileId,
+                    hardware.SystemModel,
+                    hardware.PanelHardwareId,
+                    hardware.Edid,
+                    persistedSourceEdidSignature);
+            if (!generated.Succeeded)
+            {
+                throw new SecureStateConflictException(
+                    "The journaled experimental profile could not be regenerated.");
+            }
+
+            return generated.Profile;
+        }
+
+        private static DisplayProfile ResolveRestoreProfile(
+            string profileId,
+            ResolvedMonitorTarget target,
+            Sha256Digest sourceEdidSignature)
+        {
+            DisplayProfile reviewed = ProfileCatalog.GetById(profileId);
+            if (reviewed != null)
+            {
+                return reviewed;
+            }
+
+            SmbiosIdentity identity = SmbiosReader.ReadIdentity();
+            if (identity == null || !string.Equals(
+                    identity.Manufacturer,
+                    "Apple Inc.",
+                    StringComparison.Ordinal))
+            {
+                throw new SecureStateConflictException(
+                    "The experimental profile cannot re-prove exact Apple SMBIOS identity.");
+            }
+
+            ExperimentalProfileGenerationResult generated =
+                Experimental48HzProfileGenerator.ResolveForRecovery(
+                    profileId,
+                    identity.ProductName,
+                    target.HardwareId,
+                    new EdidBaseBlock(target.BaseEdid),
+                    sourceEdidSignature);
+            if (!generated.Succeeded)
+            {
+                throw new SecureStateConflictException(
+                    "The journaled experimental profile could not be regenerated.");
+            }
+
+            return generated.Profile;
+        }
+
+        private static bool IsExperimental(EdidJournal journal)
+        {
+            return journal != null && journal.Payload != null &&
+                journal.Payload.Target != null &&
+                Experimental48HzProfileGenerator.IsExperimentalProfileId(
+                    journal.Payload.Target.ProfileId);
+        }
+
+        private static void ValidateInstallCommandForJournal(
+            EdidJournal journal,
+            DisplayProfileKind expectedKind,
+            string acknowledgementToken)
+        {
+            if (journal == null ||
+                journal.State == EdidJournalState.NotInstalled ||
+                journal.State == EdidJournalState.Restored)
+            {
+                return;
+            }
+
+            RequirePayload(journal);
+            bool experimental = IsExperimental(journal);
+            if (experimental !=
+                (expectedKind == DisplayProfileKind.Experimental))
+            {
+                throw new NotSupportedException(
+                    "The fixed Admin command does not match the journaled "
+                        + "profile kind.");
+            }
+
+            if (experimental)
+            {
+                RequireExperimentalAcknowledgement(
+                    journal.Payload.Target.ProfileId,
+                    acknowledgementToken);
+            }
+        }
+
+        private static void RequireExperimentalAcknowledgement(
+            string profileId,
+            string acknowledgementToken)
+        {
+            if (!Experimental48HzProfileGenerator
+                    .AcknowledgementTokenMatches(
+                        profileId,
+                        acknowledgementToken))
+            {
+                throw new NotSupportedException(
+                    "The acknowledged experimental profile does not match "
+                        + "the freshly proven candidate.");
             }
         }
 

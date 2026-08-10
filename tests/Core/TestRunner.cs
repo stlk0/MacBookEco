@@ -7,18 +7,19 @@ namespace MacBookEco.Tests.Core
 {
     internal static class TestRunner
     {
-        // Reviewed synthetic fixture. Per-unit serial and manufacture bytes are
-        // cleared; the checksum is recomputed. The normalized profile signature
-        // and both reviewed timings are unchanged.
+        // Reviewed synthetic fixture. Per-unit serial and manufacture-week
+        // bytes are cleared; a fixed valid year byte is used and the checksum
+        // is recomputed. The normalized profile signature and both reviewed
+        // timings are unchanged.
         private const string ReviewedAppa044Edid =
             "00 FF FF FF FF FF FF 00 06 10 44 A0 00 00 00 00 " +
-            "00 00 01 04 B5 22 16 78 02 0F B1 AE 52 43 B0 26 " +
+            "00 10 01 04 B5 22 16 78 02 0F B1 AE 52 43 B0 26 " +
             "0D 50 54 00 00 00 01 01 01 01 01 01 01 01 01 01 " +
             "01 01 01 01 01 01 E7 91 00 50 C0 80 37 70 08 20 " +
             "98 08 59 D7 10 00 00 1A 00 00 00 FC 00 43 6F 6C " +
             "6F 72 20 4C 43 44 0A 20 20 20 00 00 00 10 00 00 " +
             "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 10 " +
-            "00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 BC";
+            "00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 AC";
 
         private const string Exact48Dtd =
             "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A";
@@ -36,6 +37,36 @@ namespace MacBookEco.Tests.Core
                     "Normalized signature is stable after managed insertion",
                     NormalizedSignature),
                 Test("Known hardware selects the reviewed profile", KnownProfileMatches),
+                Test(
+                    "Generated 48 Hz timing follows the bounded golden formula",
+                    GeneratedTimingMatchesGoldenFormula),
+                Test(
+                    "Generated pixel clock uses half-up rounding at 5000",
+                    GeneratedPixelClockUsesHalfUpRounding),
+                Test(
+                    "Reviewed profiles retain priority over generated candidates",
+                    ReviewedProfileRetainsPriority),
+                Test(
+                    "Experimental fallback is deterministic and canonical",
+                    ExperimentalFallbackIsDeterministic),
+                Test(
+                    "Generator rejects identity and GPU allowlist mismatches",
+                    GeneratorRejectsIdentityAndGpuMismatches),
+                Test(
+                    "Complete EDID validation gates generated profiles",
+                    CompleteEdidValidationGatesGeneration),
+                Test(
+                    "Generator rejects unsafe preferred timing and layout",
+                    GeneratorRejectsUnsafeTimingAndLayout),
+                Test(
+                    "Native refresh allowlist uses inclusive 59-61 Hz bounds",
+                    NativeRefreshBoundsAreInclusive),
+                Test(
+                    "Generated recovery re-proves deterministic identity",
+                    GeneratedRecoveryReprovesIdentity),
+                Test(
+                    "Generated journal payload carries identity but no DTD bytes",
+                    GeneratedJournalOmitsTimingBytes),
                 Test("Unknown hardware and unknown layout are rejected", UnknownProfileRejected),
                 Test("Occupied descriptor layout refuses insertion", OccupiedLayoutRejected),
                 Test("Hardware support is distinct from install readiness", CapabilitySplit),
@@ -224,6 +255,924 @@ namespace MacBookEco.Tests.Core
             Check.Equal(1, warningMatch.Warnings.Count);
         }
 
+        private static void GeneratedTimingMatchesGoldenFormula()
+        {
+            EdidBaseBlock original = CreateOriginal();
+            ExperimentalProfileGenerationResult generated =
+                Experimental48HzProfileGenerator.Generate(
+                    CreateGeneratorHardware(original));
+
+            Check.True(generated.Succeeded);
+            Check.NotNull(generated.Profile);
+            Check.Equal(DisplayProfileKind.Experimental, generated.Profile.Kind);
+            Check.BytesEqual(
+                HexCodec.Parse(Exact48Dtd),
+                generated.Profile.TargetTiming.ToByteArray());
+            Check.Equal(
+                "exp48-v1-mbp161-7340-" +
+                    "0d248c3f0d1f6bea6b207f50f9e7cd66" +
+                    "9e518ac7dfe22c9184ad04801080b8da",
+                generated.Profile.Id);
+
+            DetailedTiming native = generated.Profile.NativeTiming;
+            DetailedTiming target = generated.Profile.TargetTiming;
+            long expectedVerticalTotal =
+                (native.PixelClock10Khz * 10000L) /
+                (native.HorizontalTotal * 48L);
+            long expectedPixelClock10Khz =
+                ((native.HorizontalTotal * expectedVerticalTotal * 48L) + 5000L) /
+                10000L;
+
+            Check.Equal((int)expectedVerticalTotal, target.VerticalTotal);
+            Check.Equal((int)expectedPixelClock10Khz, target.PixelClock10Khz);
+            Check.That(
+                target.PixelClock10Khz <= native.PixelClock10Khz,
+                "Generated pixel clock must not exceed the native clock.");
+            Check.Near(48.0, target.RefreshRateHertz, 0.01);
+
+            Check.Equal(native.HorizontalActive, target.HorizontalActive);
+            Check.Equal(native.HorizontalBlanking, target.HorizontalBlanking);
+            Check.Equal(native.HorizontalSyncOffset, target.HorizontalSyncOffset);
+            Check.Equal(
+                native.HorizontalSyncPulseWidth,
+                target.HorizontalSyncPulseWidth);
+            Check.Equal(native.VerticalActive, target.VerticalActive);
+            Check.Equal(native.VerticalSyncOffset, target.VerticalSyncOffset);
+            Check.Equal(
+                native.VerticalSyncPulseWidth,
+                target.VerticalSyncPulseWidth);
+            Check.Equal(
+                native.HorizontalImageSizeMillimeters,
+                target.HorizontalImageSizeMillimeters);
+            Check.Equal(
+                native.VerticalImageSizeMillimeters,
+                target.VerticalImageSizeMillimeters);
+            Check.Equal(
+                native.HorizontalBorderPixels,
+                target.HorizontalBorderPixels);
+            Check.Equal(native.VerticalBorderLines, target.VerticalBorderLines);
+            Check.Equal(native.Flags, target.Flags);
+            Check.Equal(
+                target.VerticalBlanking - native.VerticalBlanking,
+                target.VerticalBackPorch - native.VerticalBackPorch);
+        }
+
+        private static void GeneratedPixelClockUsesHalfUpRounding()
+        {
+            EdidBaseBlock belowHalf = CreateRoundingFixture(2527, 80);
+            EdidBaseBlock aboveHalf = CreateRoundingFixture(2473, 55);
+            ExperimentalProfileGenerationResult belowGenerated =
+                Experimental48HzProfileGenerator.Generate(
+                    CreateGeneratorHardware(belowHalf));
+            ExperimentalProfileGenerationResult aboveGenerated =
+                Experimental48HzProfileGenerator.Generate(
+                    CreateGeneratorHardware(aboveHalf));
+
+            Check.True(belowGenerated.Succeeded);
+            Check.True(aboveGenerated.Succeeded);
+            Check.Equal(2527, belowGenerated.Profile.TargetTiming.VerticalTotal);
+            Check.Equal(2473, aboveGenerated.Profile.TargetTiming.VerticalTotal);
+
+            long belowNumerator =
+                belowGenerated.Profile.TargetTiming.HorizontalTotal *
+                (long)belowGenerated.Profile.TargetTiming.VerticalTotal *
+                48L;
+            long aboveNumerator =
+                aboveGenerated.Profile.TargetTiming.HorizontalTotal *
+                (long)aboveGenerated.Profile.TargetTiming.VerticalTotal *
+                48L;
+            Check.Equal(4992L, belowNumerator % 10000L);
+            Check.Equal(5008L, aboveNumerator % 10000L);
+            Check.Equal(
+                (int)(belowNumerator / 10000L),
+                belowGenerated.Profile.TargetTiming.PixelClock10Khz);
+            Check.Equal(
+                (int)((aboveNumerator / 10000L) + 1L),
+                aboveGenerated.Profile.TargetTiming.PixelClock10Khz);
+        }
+
+        private static void ReviewedProfileRetainsPriority()
+        {
+            HardwareSnapshot hardware =
+                CreateGeneratorHardware(CreateOriginal());
+            ExperimentalProfileGenerationResult generated =
+                Experimental48HzProfileGenerator.Generate(hardware);
+            ExperimentalProfileGenerationResult fallback =
+                Experimental48HzProfileGenerator.GenerateFallback(hardware);
+            ProfileSelectionResult selected = ProfileCatalog.Select(hardware);
+
+            Check.True(generated.Succeeded);
+            Check.True(generated.Profile.IsExperimental);
+            Check.False(fallback.Succeeded);
+            Check.NotNull(selected.Profile);
+            Check.Equal(
+                ProfileCatalog.MacBookPro161Appa044ProfileId,
+                selected.Profile.Id);
+            Check.Equal(DisplayProfileKind.Verified, selected.Profile.Kind);
+        }
+
+        private static void ExperimentalFallbackIsDeterministic()
+        {
+            EdidBaseBlock panelVariant = CreatePanelVariant(0xA045);
+            HardwareSnapshot hardware = CreateGeneratorHardware(panelVariant);
+
+            Check.False(ProfileCatalog.Select(hardware).HardwareSupported);
+            ExperimentalProfileGenerationResult first =
+                Experimental48HzProfileGenerator.GenerateFallback(hardware);
+            ExperimentalProfileGenerationResult second =
+                Experimental48HzProfileGenerator.GenerateFallback(hardware);
+
+            Check.True(first.Succeeded);
+            Check.True(second.Succeeded);
+            DisplayProfileMatch firstMatch = first.Profile.Match(hardware);
+            Check.True(firstMatch.HardwareSupported);
+            Check.True(firstMatch.CanInstall);
+            Check.True(first.Profile.IsExperimental);
+            Check.Equal("APPA045", first.Profile.PanelHardwareId);
+            Check.Equal(first.Profile.Id, second.Profile.Id);
+            Check.BytesEqual(
+                first.Profile.TargetTiming.ToByteArray(),
+                second.Profile.TargetTiming.ToByteArray());
+            Check.That(
+                first.Profile.Id.StartsWith(
+                    "exp48-v1-mbp161-7340-",
+                    StringComparison.Ordinal),
+                "Generated profile ID must carry the allowlist key.");
+            Check.That(
+                first.Profile.Id.Length <= 96,
+                "Generated profile ID must fit the journal wire bound.");
+            Check.Equal(first.Profile.Id.ToLowerInvariant(), first.Profile.Id);
+            Check.True(
+                Experimental48HzProfileGenerator.IsExperimentalProfileId(
+                    first.Profile.Id));
+            string acknowledgementToken =
+                Experimental48HzProfileGenerator.CreateAcknowledgementToken(
+                    first.Profile.Id);
+            Sha256Digest parsedAcknowledgementToken;
+            Check.True(Sha256Digest.TryParseCanonical(
+                acknowledgementToken,
+                out parsedAcknowledgementToken));
+            Check.Equal(
+                acknowledgementToken,
+                Experimental48HzProfileGenerator.CreateAcknowledgementToken(
+                    second.Profile.Id));
+            Check.True(
+                Experimental48HzProfileGenerator.AcknowledgementTokenMatches(
+                    first.Profile.Id,
+                    acknowledgementToken));
+            Check.False(
+                Experimental48HzProfileGenerator.AcknowledgementTokenMatches(
+                    first.Profile.Id,
+                    acknowledgementToken.ToLowerInvariant()));
+            string otherProfileId = first.Profile.Id.Substring(
+                0,
+                first.Profile.Id.Length - 1) +
+                (first.Profile.Id.EndsWith("0", StringComparison.Ordinal)
+                    ? "1"
+                    : "0");
+            Check.That(
+                !string.Equals(
+                    acknowledgementToken,
+                    Experimental48HzProfileGenerator
+                        .CreateAcknowledgementToken(otherProfileId),
+                    StringComparison.Ordinal),
+                "Different generated profiles must have different consent tokens.");
+            Check.False(
+                Experimental48HzProfileGenerator.AcknowledgementTokenMatches(
+                    otherProfileId,
+                    acknowledgementToken));
+            Check.Throws<ArgumentException>(delegate
+            {
+                Experimental48HzProfileGenerator.CreateAcknowledgementToken(
+                    ProfileCatalog.MacBookPro161Appa044ProfileId);
+            });
+
+            byte[] anotherUnitBytes = panelVariant.ToByteArray();
+            anotherUnitBytes[12] = 0x12;
+            anotherUnitBytes[13] = 0x34;
+            anotherUnitBytes[14] = 0x56;
+            anotherUnitBytes[15] = 0x78;
+            anotherUnitBytes[16] = 0x2A;
+            anotherUnitBytes[17] = 0x21;
+            EdidBaseBlock.UpdateChecksum(anotherUnitBytes);
+            EdidBaseBlock anotherUnit = new EdidBaseBlock(anotherUnitBytes);
+            ExperimentalProfileGenerationResult anotherUnitSelection =
+                Experimental48HzProfileGenerator.GenerateFallback(
+                    CreateGeneratorHardware(anotherUnit));
+            Check.True(anotherUnitSelection.Succeeded);
+            Check.Equal(
+                panelVariant.NormalizedSignature,
+                anotherUnit.NormalizedSignature);
+            Check.That(
+                !Sha256Digest.Compute(panelVariant.ToByteArray()).Equals(
+                    Sha256Digest.Compute(anotherUnit.ToByteArray())),
+                "Per-unit EDID bytes must retain a distinct exact fingerprint.");
+            Check.Equal(first.Profile.Id, anotherUnitSelection.Profile.Id);
+            Check.BytesEqual(
+                first.Profile.TargetTiming.ToByteArray(),
+                anotherUnitSelection.Profile.TargetTiming.ToByteArray());
+        }
+
+        private static void GeneratorRejectsIdentityAndGpuMismatches()
+        {
+            EdidBaseBlock panelVariant = CreatePanelVariant(0xA045);
+            Check.True(
+                Experimental48HzProfileGenerator.Generate(
+                    CreateGeneratorHardware(panelVariant)).Succeeded);
+            Check.True(
+                Experimental48HzProfileGenerator.Generate(
+                    CreateGeneratorHardware(
+                        panelVariant,
+                        "Apple Inc.",
+                        "MacBookPro16,4",
+                        true,
+                        "APPA045",
+                        "PCI\\VEN_1002&DEV_7360",
+                        true)).Succeeded);
+
+            CheckGenerationRejected(CreateGeneratorHardware(
+                panelVariant,
+                "Apple Computer, Inc.",
+                "MacBookPro16,1",
+                true,
+                "APPA045",
+                "PCI\\VEN_1002&DEV_7340",
+                true));
+            CheckGenerationRejected(CreateGeneratorHardware(
+                panelVariant,
+                "Apple Inc.",
+                "MacBookPro16,2",
+                true,
+                "APPA045",
+                "PCI\\VEN_1002&DEV_7340",
+                true));
+            CheckGenerationRejected(CreateGeneratorHardware(
+                panelVariant,
+                "Apple Inc.",
+                "MacBookPro16,1",
+                true,
+                "APPA045",
+                "PCI\\VEN_8086&DEV_3E9B",
+                true));
+            CheckGenerationRejected(CreateGeneratorHardware(
+                panelVariant,
+                "Apple Inc.",
+                "MacBookPro16,1",
+                true,
+                "APPA045",
+                "PCI\\VEN_1002&DEV_7340EXTRA",
+                true));
+            CheckGenerationRejected(CreateGeneratorHardware(
+                panelVariant,
+                "Apple Inc.",
+                "MacBookPro16,4",
+                true,
+                "APPA045",
+                "PCI\\VEN_1002&DEV_7340",
+                true));
+            CheckGenerationRejected(CreateGeneratorHardware(
+                panelVariant,
+                "Apple Inc.",
+                "MacBookPro16,1",
+                false,
+                "APPA045",
+                "PCI\\VEN_1002&DEV_7340",
+                true));
+            CheckGenerationRejected(CreateGeneratorHardware(
+                panelVariant,
+                "Apple Inc.",
+                "MacBookPro16,1",
+                true,
+                "APPA046",
+                "PCI\\VEN_1002&DEV_7340",
+                true));
+        }
+
+        private static void CompleteEdidValidationGatesGeneration()
+        {
+            byte[] validDocument = CreateCompleteEdidDocument();
+            Check.True(EdidBaseBlock.HasValidCompleteDocument(validDocument));
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    CreateOriginal().ToByteArray()));
+            Check.False(EdidBaseBlock.HasValidCompleteDocument(new byte[129]));
+
+            byte[] badExtensionChecksum = (byte[])validDocument.Clone();
+            badExtensionChecksum[EdidBaseBlock.Length + 12] ^= 0x01;
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(badExtensionChecksum));
+
+            byte[] trailingBlock = new byte[EdidBaseBlock.Length * 3];
+            Buffer.BlockCopy(
+                validDocument,
+                0,
+                trailingBlock,
+                0,
+                validDocument.Length);
+            Check.False(EdidBaseBlock.HasValidCompleteDocument(trailingBlock));
+
+            int extensionOffset = EdidBaseBlock.Length;
+            byte[] badNativeCount = (byte[])validDocument.Clone();
+            badNativeCount[extensionOffset + 3] = 0x0F;
+            UpdateDocumentBlockChecksum(badNativeCount, 1);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(badNativeCount));
+
+            byte[] reservedDataBlock = (byte[])validDocument.Clone();
+            reservedDataBlock[extensionOffset + 2] = 6;
+            reservedDataBlock[extensionOffset + 4] = 0x01;
+            UpdateDocumentBlockChecksum(reservedDataBlock, 1);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(reservedDataBlock));
+
+            byte[] emptyExtendedBlock = (byte[])validDocument.Clone();
+            emptyExtendedBlock[extensionOffset + 2] = 5;
+            emptyExtendedBlock[extensionOffset + 4] = 0xE0;
+            UpdateDocumentBlockChecksum(emptyExtendedBlock, 1);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(emptyExtendedBlock));
+
+            byte[] unknownExtendedBlock = (byte[])validDocument.Clone();
+            unknownExtendedBlock[extensionOffset + 2] = 7;
+            unknownExtendedBlock[extensionOffset + 4] = 0xE2;
+            unknownExtendedBlock[extensionOffset + 5] = 0x7F;
+            UpdateDocumentBlockChecksum(unknownExtendedBlock, 1);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(unknownExtendedBlock));
+
+            byte[] unsupportedExtension = (byte[])validDocument.Clone();
+            unsupportedExtension[extensionOffset] = 0x70;
+            UpdateDocumentBlockChecksum(unsupportedExtension, 1);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(unsupportedExtension));
+
+            byte[] unsupportedCtaRevision = (byte[])validDocument.Clone();
+            unsupportedCtaRevision[extensionOffset + 1] = 4;
+            UpdateDocumentBlockChecksum(unsupportedCtaRevision, 1);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    unsupportedCtaRevision));
+
+            byte[] unsupportedLegacyCta = (byte[])validDocument.Clone();
+            unsupportedLegacyCta[extensionOffset + 1] = 1;
+            UpdateDocumentBlockChecksum(unsupportedLegacyCta, 1);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    unsupportedLegacyCta));
+
+            unsupportedLegacyCta[extensionOffset + 1] = 2;
+            UpdateDocumentBlockChecksum(unsupportedLegacyCta, 1);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    unsupportedLegacyCta));
+
+            byte[] unsupportedBaseVersion = (byte[])validDocument.Clone();
+            unsupportedBaseVersion[18] = 2;
+            unsupportedBaseVersion[19] = 0;
+            UpdateDocumentBlockChecksum(unsupportedBaseVersion, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    unsupportedBaseVersion));
+
+            byte[] unsupportedBaseRevision = (byte[])validDocument.Clone();
+            unsupportedBaseRevision[19] = 5;
+            UpdateDocumentBlockChecksum(unsupportedBaseRevision, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    unsupportedBaseRevision));
+
+            byte[] unsupportedEdid13 = (byte[])validDocument.Clone();
+            unsupportedEdid13[19] = 3;
+            UpdateDocumentBlockChecksum(unsupportedEdid13, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(unsupportedEdid13));
+
+            byte[] unsupportedContinuousFrequency =
+                (byte[])validDocument.Clone();
+            unsupportedContinuousFrequency[24] |= 0x01;
+            UpdateDocumentBlockChecksum(unsupportedContinuousFrequency, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    unsupportedContinuousFrequency));
+
+            byte[] reservedDigitalInterface = (byte[])validDocument.Clone();
+            reservedDigitalInterface[20] = 0xBF;
+            UpdateDocumentBlockChecksum(reservedDigitalInterface, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    reservedDigitalInterface));
+
+            byte[] reservedDigitalBitDepth = (byte[])validDocument.Clone();
+            reservedDigitalBitDepth[20] = 0xF5;
+            UpdateDocumentBlockChecksum(reservedDigitalBitDepth, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    reservedDigitalBitDepth));
+
+            byte[] reservedManufacturerBit = (byte[])validDocument.Clone();
+            reservedManufacturerBit[8] |= 0x80;
+            UpdateDocumentBlockChecksum(reservedManufacturerBit, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    reservedManufacturerBit));
+
+            byte[] reservedManufactureWeek = (byte[])validDocument.Clone();
+            reservedManufactureWeek[16] = 0x37;
+            UpdateDocumentBlockChecksum(reservedManufactureWeek, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    reservedManufactureWeek));
+
+            byte[] reservedManufactureYear = (byte[])validDocument.Clone();
+            reservedManufactureYear[17] = 0x0F;
+            UpdateDocumentBlockChecksum(reservedManufactureYear, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    reservedManufactureYear));
+
+            byte[] unsupportedAnalogInput = (byte[])validDocument.Clone();
+            unsupportedAnalogInput[20] &= 0x7F;
+            UpdateDocumentBlockChecksum(unsupportedAnalogInput, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    unsupportedAnalogInput));
+
+            byte[] unsupportedExtensionGamma = (byte[])validDocument.Clone();
+            unsupportedExtensionGamma[23] = 0xFF;
+            UpdateDocumentBlockChecksum(unsupportedExtensionGamma, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    unsupportedExtensionGamma));
+
+            byte[] unsupportedSrgbDeclaration = (byte[])validDocument.Clone();
+            unsupportedSrgbDeclaration[24] |= 0x04;
+            UpdateDocumentBlockChecksum(unsupportedSrgbDeclaration, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    unsupportedSrgbDeclaration));
+
+            byte[] unsupportedManufacturerTiming =
+                (byte[])validDocument.Clone();
+            unsupportedManufacturerTiming[37] |= 0x01;
+            UpdateDocumentBlockChecksum(unsupportedManufacturerTiming, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    unsupportedManufacturerTiming));
+
+            byte[] appleEstablishedTiming = (byte[])validDocument.Clone();
+            appleEstablishedTiming[37] |= 0x80;
+            UpdateDocumentBlockChecksum(appleEstablishedTiming, 0);
+            Check.True(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    appleEstablishedTiming));
+
+            byte[] malformedStandardTiming = (byte[])validDocument.Clone();
+            malformedStandardTiming[38] = 0x00;
+            malformedStandardTiming[39] = 0x02;
+            UpdateDocumentBlockChecksum(malformedStandardTiming, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    malformedStandardTiming));
+
+            byte[] minimumStandardTiming = (byte[])validDocument.Clone();
+            minimumStandardTiming[38] = 0x01;
+            minimumStandardTiming[39] = 0x02;
+            UpdateDocumentBlockChecksum(minimumStandardTiming, 0);
+            Check.True(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    minimumStandardTiming));
+
+            byte[] invalidManufacturer = (byte[])validDocument.Clone();
+            invalidManufacturer[8] = 0;
+            invalidManufacturer[9] = 0;
+            UpdateDocumentBlockChecksum(invalidManufacturer, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(invalidManufacturer));
+
+            byte[] malformedMonitorDescriptor = (byte[])validDocument.Clone();
+            int descriptorOffset = EdidBaseBlock.FirstDescriptorOffset +
+                (2 * DetailedTiming.EncodedLength);
+            malformedMonitorDescriptor[descriptorOffset + 2] = 1;
+            UpdateDocumentBlockChecksum(malformedMonitorDescriptor, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    malformedMonitorDescriptor));
+
+            byte[] missingRequiredFirstDtd = (byte[])validDocument.Clone();
+            SetOccupiedMonitorDescriptor(missingRequiredFirstDtd, 0, 0xFC);
+            UpdateDocumentBlockChecksum(missingRequiredFirstDtd, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    missingRequiredFirstDtd));
+
+            byte[] allZeroBaseDescriptor = (byte[])validDocument.Clone();
+            Array.Clear(
+                allZeroBaseDescriptor,
+                descriptorOffset,
+                DetailedTiming.EncodedLength);
+            UpdateDocumentBlockChecksum(allZeroBaseDescriptor, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    allZeroBaseDescriptor));
+
+            byte[] dtdAfterMonitorDescriptor = (byte[])validDocument.Clone();
+            Buffer.BlockCopy(
+                dtdAfterMonitorDescriptor,
+                EdidBaseBlock.FirstDescriptorOffset,
+                dtdAfterMonitorDescriptor,
+                descriptorOffset,
+                DetailedTiming.EncodedLength);
+            UpdateDocumentBlockChecksum(dtdAfterMonitorDescriptor, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    dtdAfterMonitorDescriptor));
+
+            byte[] malformedTextPadding = (byte[])validDocument.Clone();
+            int textDescriptorOffset = EdidBaseBlock.FirstDescriptorOffset +
+                DetailedTiming.EncodedLength;
+            malformedTextPadding[textDescriptorOffset + 17] = (byte)'X';
+            UpdateDocumentBlockChecksum(malformedTextPadding, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    malformedTextPadding));
+
+            byte[] unsupportedRangeLimits = (byte[])validDocument.Clone();
+            SetOccupiedMonitorDescriptor(unsupportedRangeLimits, 2, 0xFD);
+            UpdateDocumentBlockChecksum(unsupportedRangeLimits, 0);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    unsupportedRangeLimits));
+
+            byte[] unsupportedAudioBlock = (byte[])validDocument.Clone();
+            unsupportedAudioBlock[extensionOffset + 2] = 8;
+            unsupportedAudioBlock[extensionOffset + 4] = 0x23;
+            UpdateDocumentBlockChecksum(unsupportedAudioBlock, 1);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    unsupportedAudioBlock));
+
+            byte[] anotherUnit = (byte[])validDocument.Clone();
+            anotherUnit[12] = 0x12;
+            anotherUnit[13] = 0x34;
+            anotherUnit[16] = 0x20;
+            anotherUnit[17] = 0x22;
+            UpdateDocumentBlockChecksum(anotherUnit, 0);
+            Check.Equal(
+                EdidBaseBlock.ComputeNormalizedDocumentSignature(validDocument),
+                EdidBaseBlock.ComputeNormalizedDocumentSignature(anotherUnit));
+
+            var multipleCtaExtensions =
+                new byte[EdidBaseBlock.Length * 3];
+            Buffer.BlockCopy(
+                validDocument,
+                0,
+                multipleCtaExtensions,
+                0,
+                EdidBaseBlock.Length * 2);
+            Buffer.BlockCopy(
+                validDocument,
+                EdidBaseBlock.Length,
+                multipleCtaExtensions,
+                EdidBaseBlock.Length * 2,
+                EdidBaseBlock.Length);
+            multipleCtaExtensions[126] = 2;
+            UpdateDocumentBlockChecksum(multipleCtaExtensions, 0);
+            Check.True(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    multipleCtaExtensions));
+
+            byte[] inconsistentCtaCapabilities =
+                (byte[])multipleCtaExtensions.Clone();
+            inconsistentCtaCapabilities[
+                (EdidBaseBlock.Length * 2) + 3] = 0x80;
+            UpdateDocumentBlockChecksum(inconsistentCtaCapabilities, 2);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocument(
+                    inconsistentCtaCapabilities));
+
+            byte[] changedExtension = (byte[])validDocument.Clone();
+            changedExtension[extensionOffset + 3] = 0x80;
+            UpdateDocumentBlockChecksum(changedExtension, 1);
+            Check.True(
+                EdidBaseBlock.HasValidCompleteDocument(changedExtension));
+            Sha256Digest originalSourceSignature =
+                EdidBaseBlock.ComputeNormalizedDocumentSignature(validDocument);
+            Sha256Digest changedSourceSignature =
+                EdidBaseBlock.ComputeNormalizedDocumentSignature(
+                    changedExtension);
+            Check.That(
+                !originalSourceSignature.Equals(changedSourceSignature),
+                "A changed extension block must change source identity.");
+
+            ExperimentalProfileGenerationResult originalGenerated =
+                Experimental48HzProfileGenerator.Generate(
+                    CreateGeneratorHardware(CreateOriginal()));
+            var changedSourceHardware = new HardwareSnapshot(
+                "Apple Inc.",
+                "MacBookPro16,1",
+                true,
+                "APPA044",
+                CreateOriginal(),
+                "AMD Radeon Pro",
+                "PCI\\VEN_1002&DEV_7340",
+                string.Empty,
+                true,
+                changedSourceSignature);
+            ExperimentalProfileGenerationResult changedGenerated =
+                Experimental48HzProfileGenerator.Generate(
+                    changedSourceHardware);
+            Check.True(originalGenerated.Succeeded);
+            Check.True(changedGenerated.Succeeded);
+            Check.That(
+                !string.Equals(
+                    originalGenerated.Profile.Id,
+                    changedGenerated.Profile.Id,
+                    StringComparison.Ordinal),
+                "The generated ID must bind every source EDID extension.");
+            Check.False(
+                Experimental48HzProfileGenerator.ResolveForRecovery(
+                    originalGenerated.Profile.Id,
+                    "MacBookPro16,1",
+                    "APPA044",
+                    CreateOriginal(),
+                    changedSourceSignature).Succeeded);
+
+            EdidBaseBlock panelVariant = CreatePanelVariant(0xA045);
+            CheckGenerationRejected(new HardwareSnapshot(
+                "Apple Inc.",
+                "MacBookPro16,1",
+                true,
+                panelVariant.HardwareId,
+                panelVariant,
+                "AMD Radeon Pro",
+                "PCI\\VEN_1002&DEV_7340",
+                string.Empty));
+            CheckGenerationRejected(CreateGeneratorHardware(
+                panelVariant,
+                "Apple Inc.",
+                "MacBookPro16,1",
+                true,
+                "APPA045",
+                "PCI\\VEN_1002&DEV_7340",
+                false));
+            Check.True(
+                Experimental48HzProfileGenerator.Generate(
+                    CreateGeneratorHardware(panelVariant)).Succeeded);
+        }
+
+        private static void GeneratorRejectsUnsafeTimingAndLayout()
+        {
+            byte[] noPreferredFlag = CreateOriginal().ToByteArray();
+            noPreferredFlag[24] = (byte)(noPreferredFlag[24] & ~0x02);
+            EdidBaseBlock.UpdateChecksum(noPreferredFlag);
+            CheckGenerationRejected(CreateGeneratorHardware(
+                new EdidBaseBlock(noPreferredFlag)));
+
+            byte[] nonDtd = CreateOriginal().ToByteArray();
+            SetOccupiedMonitorDescriptor(nonDtd, 0, 0xFC);
+            EdidBaseBlock.UpdateChecksum(nonDtd);
+            CheckGenerationRejected(CreateGeneratorHardware(
+                new EdidBaseBlock(nonDtd)));
+
+            byte[] interlaced = CreateOriginal().ToByteArray();
+            interlaced[
+                EdidBaseBlock.FirstDescriptorOffset +
+                DetailedTiming.EncodedLength -
+                1] |= 0x80;
+            EdidBaseBlock.UpdateChecksum(interlaced);
+            CheckGenerationRejected(CreateGeneratorHardware(
+                new EdidBaseBlock(interlaced)));
+
+            byte[] zeroSyncWidth = CreateOriginal().ToByteArray();
+            int preferredOffset = EdidBaseBlock.FirstDescriptorOffset;
+            zeroSyncWidth[preferredOffset + 9] = 0;
+            zeroSyncWidth[preferredOffset + 11] =
+                (byte)(zeroSyncWidth[preferredOffset + 11] & 0xCF);
+            EdidBaseBlock.UpdateChecksum(zeroSyncWidth);
+            CheckGenerationRejected(CreateGeneratorHardware(
+                new EdidBaseBlock(zeroSyncWidth)));
+
+            byte[] occupied = CreateOriginal().ToByteArray();
+            SetOccupiedMonitorDescriptor(occupied, 2, 0xFC);
+            SetOccupiedMonitorDescriptor(occupied, 3, 0xFE);
+            EdidBaseBlock.UpdateChecksum(occupied);
+            CheckGenerationRejected(CreateGeneratorHardware(
+                new EdidBaseBlock(occupied)));
+
+            EdidBaseBlock existingTarget = CreateOriginal().InsertDetailedTiming(
+                DetailedTiming.ParseHex(Exact48Dtd));
+            CheckGenerationRejected(CreateGeneratorHardware(existingTarget));
+        }
+
+        private static void NativeRefreshBoundsAreInclusive()
+        {
+            DetailedTiming native = CreateOriginal().PreferredTiming;
+            long totalPixels =
+                native.HorizontalTotal * (long)native.VerticalTotal;
+            int minimumAllowedClock = (int)(
+                ((totalPixels * 59L) + 9999L) / 10000L);
+            int maximumAllowedClock = (int)(
+                (totalPixels * 61L) / 10000L);
+
+            EdidBaseBlock minimumAllowed = WithPreferredPixelClock(
+                CreateOriginal(),
+                minimumAllowedClock);
+            EdidBaseBlock maximumAllowed = WithPreferredPixelClock(
+                CreateOriginal(),
+                maximumAllowedClock);
+            Check.That(
+                minimumAllowed.PreferredTiming.RefreshRateHertz >= 59.0,
+                "The encoded minimum fixture must be inside the inclusive gate.");
+            Check.That(
+                maximumAllowed.PreferredTiming.RefreshRateHertz <= 61.0,
+                "The encoded maximum fixture must be inside the inclusive gate.");
+            Check.True(
+                Experimental48HzProfileGenerator.Generate(
+                    CreateGeneratorHardware(minimumAllowed)).Succeeded);
+            Check.True(
+                Experimental48HzProfileGenerator.Generate(
+                    CreateGeneratorHardware(maximumAllowed)).Succeeded);
+
+            CheckGenerationRejected(CreateGeneratorHardware(
+                WithPreferredPixelClock(
+                    CreateOriginal(),
+                    minimumAllowedClock - 1)));
+            CheckGenerationRejected(CreateGeneratorHardware(
+                WithPreferredPixelClock(
+                    CreateOriginal(),
+                    maximumAllowedClock + 1)));
+        }
+
+        private static void GeneratedRecoveryReprovesIdentity()
+        {
+            EdidBaseBlock original = CreatePanelVariant(0xA045);
+            ExperimentalProfileGenerationResult generated =
+                Experimental48HzProfileGenerator.Generate(
+                    CreateGeneratorHardware(original));
+            Check.True(generated.Succeeded);
+            Check.Equal("mbp161-7340", generated.HardwareKey);
+
+            ExperimentalProfileGenerationResult originalRecovery =
+                Experimental48HzProfileGenerator.ResolveForRecovery(
+                    generated.Profile.Id,
+                    "MacBookPro16,1",
+                    "APPA045",
+                    original,
+                    generated.Profile.SourceEdidSignature);
+            Check.True(originalRecovery.Succeeded);
+            Check.Equal(generated.Profile.Id, originalRecovery.Profile.Id);
+            Check.False(
+                Experimental48HzProfileGenerator.ResolveForRecovery(
+                    generated.Profile.Id,
+                    "MacBookPro16,1",
+                    "APPA045",
+                    original,
+                    null).Succeeded);
+
+            byte[] ownedBytes = original.InsertDetailedTiming(
+                generated.Profile.TargetTiming).ToByteArray();
+            SetOccupiedMonitorDescriptor(ownedBytes, 3, 0xFE);
+            EdidBaseBlock.UpdateChecksum(ownedBytes);
+            EdidBaseBlock ownedWithoutFreeSlot = new EdidBaseBlock(ownedBytes);
+            Check.Equal(-1, ownedWithoutFreeSlot.FindFreeDescriptor());
+            Check.True(
+                ownedWithoutFreeSlot.ContainsDetailedTiming(
+                    generated.Profile.TargetTiming));
+            ExperimentalProfileGenerationResult ownedRecovery =
+                Experimental48HzProfileGenerator.ResolveForRecovery(
+                    generated.Profile.Id,
+                    "mbp161-7340",
+                    "MacBookPro16,1",
+                    "APPA045",
+                    ownedWithoutFreeSlot,
+                    generated.Profile.SourceEdidSignature);
+            Check.True(ownedRecovery.Succeeded);
+            Check.BytesEqual(
+                generated.Profile.TargetTiming.ToByteArray(),
+                ownedRecovery.Profile.TargetTiming.ToByteArray());
+            CheckGenerationRejected(CreateGeneratorHardware(
+                ownedWithoutFreeSlot));
+
+            string tamperedId = generated.Profile.Id.Substring(
+                0,
+                generated.Profile.Id.Length - 1) +
+                (generated.Profile.Id.EndsWith("0", StringComparison.Ordinal)
+                    ? "1"
+                    : "0");
+            Check.False(
+                Experimental48HzProfileGenerator.ResolveForRecovery(
+                    tamperedId,
+                    "MacBookPro16,1",
+                    "APPA045",
+                    original,
+                    generated.Profile.SourceEdidSignature).Succeeded);
+            Check.False(
+                Experimental48HzProfileGenerator.ResolveForRecovery(
+                    generated.Profile.Id,
+                    "MacBookPro16,4",
+                    "APPA045",
+                    original,
+                    generated.Profile.SourceEdidSignature).Succeeded);
+            Check.False(
+                Experimental48HzProfileGenerator.ResolveForRecovery(
+                    generated.Profile.Id,
+                    "mbp164-7360",
+                    "MacBookPro16,1",
+                    "APPA045",
+                    original,
+                    generated.Profile.SourceEdidSignature).Succeeded);
+            Check.False(
+                Experimental48HzProfileGenerator.ResolveForRecovery(
+                    generated.Profile.Id,
+                    "MacBookPro16,1",
+                    "APPA046",
+                    original,
+                    generated.Profile.SourceEdidSignature).Succeeded);
+            Check.False(
+                Experimental48HzProfileGenerator.ResolveForRecovery(
+                    generated.Profile.Id,
+                    "MacBookPro16,1",
+                    "APPA046",
+                    CreatePanelVariant(0xA046),
+                    generated.Profile.SourceEdidSignature).Succeeded);
+            Check.False(
+                Experimental48HzProfileGenerator.ResolveForRecovery(
+                    generated.Profile.Id,
+                    "MacBookPro16,1",
+                    "APPA045",
+                    WithPreferredPixelClock(
+                        original,
+                        original.PreferredTiming.PixelClock10Khz - 1),
+                    generated.Profile.SourceEdidSignature).Succeeded);
+        }
+
+        private static void GeneratedJournalOmitsTimingBytes()
+        {
+            EdidBaseBlock original = CreatePanelVariant(0xA045);
+            ExperimentalProfileGenerationResult generated =
+                Experimental48HzProfileGenerator.Generate(
+                    CreateGeneratorHardware(original));
+            Check.True(generated.Succeeded);
+
+            byte[] ownedOverride = original.InsertDetailedTiming(
+                generated.Profile.TargetTiming).ToByteArray();
+            var target = new EdidTargetIdentity(
+                generated.Profile.Id,
+                "DISPLAY\\APPA045\\4&REDACTED&0&UID0000",
+                "APPA045",
+                "APP",
+                Sha256Digest.Compute(original.ToByteArray()));
+            var payload = new EdidJournalPayload(
+                target,
+                Sha256Digest.Compute(ownedOverride),
+                generated.Profile.SourceEdidSignature);
+            DateTime now = new DateTime(
+                2026,
+                8,
+                10,
+                12,
+                0,
+                0,
+                DateTimeKind.Utc);
+            var journal = new EdidJournal(
+                JournalOperationId.NewId(),
+                new JournalGeneration(1),
+                now,
+                now,
+                EdidJournalState.InstallPending,
+                payload);
+
+            byte[] serialized = JournalCodec.Serialize(journal);
+            Check.False(ContainsBytes(
+                serialized,
+                generated.Profile.TargetTiming.ToByteArray()));
+            EdidJournal parsed = JournalCodec.Parse(serialized) as EdidJournal;
+            Check.NotNull(parsed);
+            Check.Equal(
+                generated.Profile.Id,
+                parsed.Payload.Target.ProfileId);
+            Check.Equal(
+                payload.OwnedOverrideHash,
+                parsed.Payload.OwnedOverrideHash);
+            Check.Equal(
+                payload.Target.NormalizedEdidHash,
+                parsed.Payload.Target.NormalizedEdidHash);
+            Check.Equal(
+                payload.SourceEdidSignature,
+                parsed.Payload.SourceEdidSignature);
+            Check.Throws<ArgumentException>(delegate
+            {
+                parsed.TransitionTo(
+                    EdidJournalState.Installed,
+                    new EdidJournalPayload(
+                        payload.Target,
+                        payload.OwnedOverrideHash,
+                        Sha256Digest.Compute(new byte[] { 1 })),
+                    parsed.Generation.Next(),
+                    now.AddSeconds(1));
+            });
+        }
+
         private static void UnknownProfileRejected()
         {
             var wrongModel = new HardwareSnapshot(
@@ -283,7 +1232,7 @@ namespace MacBookEco.Tests.Core
         {
             var occupiedBytes = CreateOriginal().ToByteArray();
             SetOccupiedMonitorDescriptor(occupiedBytes, 2, 0xFC);
-            SetOccupiedMonitorDescriptor(occupiedBytes, 3, 0xFD);
+            SetOccupiedMonitorDescriptor(occupiedBytes, 3, 0xFE);
             EdidBaseBlock.UpdateChecksum(occupiedBytes);
 
             var occupied = new EdidBaseBlock(occupiedBytes);
@@ -299,7 +1248,7 @@ namespace MacBookEco.Tests.Core
         {
             var occupiedBytes = CreateOriginal().ToByteArray();
             SetOccupiedMonitorDescriptor(occupiedBytes, 2, 0xFC);
-            SetOccupiedMonitorDescriptor(occupiedBytes, 3, 0xFD);
+            SetOccupiedMonitorDescriptor(occupiedBytes, 3, 0xFE);
             EdidBaseBlock.UpdateChecksum(occupiedBytes);
 
             var occupiedHardware = CreateKnownHardware(
@@ -1298,6 +2247,205 @@ namespace MacBookEco.Tests.Core
                 });
         }
 
+        private static void CheckGenerationRejected(HardwareSnapshot hardware)
+        {
+            ExperimentalProfileGenerationResult generated =
+                Experimental48HzProfileGenerator.Generate(hardware);
+            Check.False(generated.Succeeded);
+            Check.That(
+                generated.Profile == null,
+                "A rejected generated profile must not expose a candidate.");
+            Check.That(
+                generated.RejectionReasons.Count > 0,
+                "A rejected generated profile must explain its failed gate.");
+        }
+
+        private static HardwareSnapshot CreateGeneratorHardware(
+            EdidBaseBlock edid)
+        {
+            return CreateGeneratorHardware(
+                edid,
+                "Apple Inc.",
+                "MacBookPro16,1",
+                true,
+                edid.HardwareId,
+                "PCI\\VEN_1002&DEV_7340&SUBSYS_REDACTED",
+                true);
+        }
+
+        private static HardwareSnapshot CreateGeneratorHardware(
+            EdidBaseBlock edid,
+            string manufacturer,
+            string systemModel,
+            bool isInternalDisplay,
+            string panelHardwareId,
+            string gpuDeviceId,
+            bool completeEdidIsValid)
+        {
+            return new HardwareSnapshot(
+                manufacturer,
+                systemModel,
+                isInternalDisplay,
+                panelHardwareId,
+                edid,
+                "AMD Radeon Pro",
+                gpuDeviceId,
+                string.Empty,
+                completeEdidIsValid,
+                completeEdidIsValid
+                    ? EdidBaseBlock.ComputeNormalizedDocumentSignature(
+                        CreateCompleteEdidDocument(edid))
+                    : null);
+        }
+
+        private static EdidBaseBlock CreatePanelVariant(ushort productCode)
+        {
+            byte[] bytes = CreateOriginal().ToByteArray();
+            bytes[10] = (byte)(productCode & 0xFF);
+            bytes[11] = (byte)((productCode >> 8) & 0xFF);
+            EdidBaseBlock.UpdateChecksum(bytes);
+            return new EdidBaseBlock(bytes);
+        }
+
+        private static EdidBaseBlock WithPreferredPixelClock(
+            EdidBaseBlock source,
+            int pixelClock10Khz)
+        {
+            DetailedTiming timing = source.PreferredTiming;
+            return WithPreferredTiming(
+                source,
+                pixelClock10Khz,
+                timing.VerticalBlanking);
+        }
+
+        private static EdidBaseBlock CreateRoundingFixture(
+            int targetVerticalTotal,
+            int nativeVerticalBlanking)
+        {
+            EdidBaseBlock source = CreateOriginal();
+            DetailedTiming timing = source.PreferredTiming;
+            long minimumNativeClockHertz =
+                timing.HorizontalTotal *
+                (long)targetVerticalTotal *
+                48L;
+            int nativePixelClock10Khz = (int)(
+                (minimumNativeClockHertz + 9999L) / 10000L);
+            return WithPreferredTiming(
+                source,
+                nativePixelClock10Khz,
+                nativeVerticalBlanking);
+        }
+
+        private static EdidBaseBlock WithPreferredTiming(
+            EdidBaseBlock source,
+            int pixelClock10Khz,
+            int verticalBlanking)
+        {
+            DetailedTiming timing = source.PreferredTiming;
+            var replacement = new DetailedTiming(
+                pixelClock10Khz,
+                timing.HorizontalActive,
+                timing.HorizontalBlanking,
+                timing.VerticalActive,
+                verticalBlanking,
+                timing.HorizontalSyncOffset,
+                timing.HorizontalSyncPulseWidth,
+                timing.VerticalSyncOffset,
+                timing.VerticalSyncPulseWidth,
+                timing.HorizontalImageSizeMillimeters,
+                timing.VerticalImageSizeMillimeters,
+                timing.HorizontalBorderPixels,
+                timing.VerticalBorderLines,
+                timing.Flags);
+            byte[] bytes = source.ToByteArray();
+            replacement.WriteTo(bytes, EdidBaseBlock.FirstDescriptorOffset);
+            EdidBaseBlock.UpdateChecksum(bytes);
+            return new EdidBaseBlock(bytes);
+        }
+
+        private static byte[] CreateCompleteEdidDocument()
+        {
+            return CreateCompleteEdidDocument(CreateOriginal());
+        }
+
+        private static byte[] CreateCompleteEdidDocument(
+            EdidBaseBlock source)
+        {
+            byte[] baseBlock = source.ToByteArray();
+            var extensionBlock = new byte[EdidBaseBlock.Length];
+            extensionBlock[0] = 0x02;
+            extensionBlock[1] = 0x03;
+            extensionBlock[2] = 0x04;
+            EdidBaseBlock.UpdateChecksum(extensionBlock);
+
+            var document = new byte[EdidBaseBlock.Length * 2];
+            Buffer.BlockCopy(
+                baseBlock,
+                0,
+                document,
+                0,
+                baseBlock.Length);
+            Buffer.BlockCopy(
+                extensionBlock,
+                0,
+                document,
+                EdidBaseBlock.Length,
+                extensionBlock.Length);
+            return document;
+        }
+
+        private static void UpdateDocumentBlockChecksum(
+            byte[] document,
+            int blockIndex)
+        {
+            var block = new byte[EdidBaseBlock.Length];
+            Buffer.BlockCopy(
+                document,
+                blockIndex * EdidBaseBlock.Length,
+                block,
+                0,
+                block.Length);
+            EdidBaseBlock.UpdateChecksum(block);
+            Buffer.BlockCopy(
+                block,
+                0,
+                document,
+                blockIndex * EdidBaseBlock.Length,
+                block.Length);
+        }
+
+        private static bool ContainsBytes(byte[] value, byte[] candidate)
+        {
+            if (
+                value == null ||
+                candidate == null ||
+                candidate.Length == 0 ||
+                candidate.Length > value.Length)
+            {
+                return false;
+            }
+
+            for (int offset = 0; offset <= value.Length - candidate.Length; offset++)
+            {
+                bool match = true;
+                for (int index = 0; index < candidate.Length; index++)
+                {
+                    if (value[offset + index] != candidate[index])
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static HardwareSnapshot CreateKnownHardware(EdidBaseBlock edid)
         {
             return new HardwareSnapshot(
@@ -1325,6 +2473,18 @@ namespace MacBookEco.Tests.Core
                 (descriptorIndex * DetailedTiming.EncodedLength);
             Array.Clear(edid, offset, DetailedTiming.EncodedLength);
             edid[offset + 3] = tag;
+            if (tag == 0xFC || tag == 0xFE || tag == 0xFF)
+            {
+                for (int index = offset + 5;
+                    index < offset + DetailedTiming.EncodedLength;
+                    index++)
+                {
+                    edid[index] = 0x20;
+                }
+
+                edid[offset + 5] = (byte)'T';
+                edid[offset + 6] = 0x0A;
+            }
         }
     }
 }

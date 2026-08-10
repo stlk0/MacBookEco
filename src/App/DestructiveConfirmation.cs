@@ -3,8 +3,8 @@ using System.Windows.Forms;
 namespace MacBookEco.App
 {
     /// <summary>
-    /// The two destructive confirmations, asked the same way from wherever the
-    /// user starts them.
+    /// Safety confirmations, asked the same way from wherever the user starts
+    /// them.
     ///
     /// DestructivePrompts already shared the wording after the tray and the
     /// dashboard drifted apart. The icon and the default button had not been
@@ -37,6 +37,23 @@ namespace MacBookEco.App
                 DestructivePrompts.RestorePowerPlanTitle,
                 MessageBoxIcon.Question,
                 MessageBoxDefaultButton.Button1);
+        }
+
+        internal static bool InstallExperimentalDisplaySupport(
+            IWin32Window owner,
+            string candidateSummary)
+        {
+            string summary = string.IsNullOrWhiteSpace(candidateSummary)
+                ? "Candidate details are unavailable."
+                : candidateSummary.Trim();
+            return Ask(
+                owner,
+                DestructivePrompts.InstallExperimentalDisplaySupport
+                    + summary
+                    + "\r\n\r\nContinue with this experimental installation?",
+                DestructivePrompts.InstallExperimentalDisplaySupportTitle,
+                MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
         }
 
         private static bool Ask(

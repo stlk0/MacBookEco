@@ -30,13 +30,36 @@ They are not implied by the host-safe test command.
 
 ## Display profiles
 
-Do not submit a calculated timing without evidence from the actual machine. Use
-the [display profile issue](.github/ISSUE_TEMPLATE/display-profile.yml), which
-requests the model, panel, original and candidate timings, GPU/driver, rollback,
-removal, cold-boot, and telemetry evidence.
+Reviewed static profiles have priority over local generation. Do not promote a
+calculated candidate to a reviewed profile without evidence from the actual
+machine. Use the [display profile issue](.github/ISSUE_TEMPLATE/display-profile.yml),
+which requests the model, panel, original and candidate timings, GPU/driver,
+rollback, removal, cold-boot, and telemetry evidence.
+
+Changes to the experimental generator must keep its 59-through-61-Hz inclusive
+source gate, 0.01-Hz maximum target error, exact integer formula, complete
+hardware and topology gates, and deterministic identity. Add compiled behavior
+tests for accepted math, every rejection boundary, static-profile priority,
+recovery regeneration, exact ownership, and risk-confirmation cancellation.
+Declining the experimental warning must invoke no helper or mutation.
+
+Admin helper commands remain fixed. Reviewed install and removal are
+argument-free. Experimental install carries only a canonical 64-hex token that
+the helper compares with its freshly regenerated profile to bind the user's
+acknowledgement. Do not pass a profile ID, EDID/DTD bytes, registry path, device
+path, or generator inputs across the elevation boundary or through the journal.
+
+The best-effort
+[Intel dGPU MacBook research catalog](docs/INTEL_DGPU_MACBOOK_CATALOG.md) is not
+a support matrix. A documented model or panel report does not by itself
+authorize generation or make a candidate verified.
 
 Never commit serial numbers, device-instance suffixes, battery reports, registry
 exports, acceptance evidence, or private machine logs.
+
+Windows, hostile-state VM, reboot, visual rollback, cold-boot, and real-hardware
+acceptance must remain explicitly deferred until they are run in their documented
+safe environments. Do not report a deferred phase as passed.
 
 ## Release and signing changes
 

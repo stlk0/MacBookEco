@@ -9,6 +9,7 @@ namespace MacBookEco.App
     internal enum AdminCommand
     {
         InstallDisplay,
+        InstallExperimentalDisplay,
         RemoveDisplay,
         ApplyPowerNormal,
         ApplyPowerCool,
@@ -62,7 +63,9 @@ namespace MacBookEco.App
         /// the type summary for why that wait has no upper bound.  A UAC
         /// refusal is a Cancelled result, not a failure.
         /// </summary>
-        public OptimizationActionResult Run(AdminCommand command)
+        public OptimizationActionResult Run(
+            AdminCommand command,
+            string experimentalAcknowledgementToken = null)
         {
             if (!File.Exists(_executablePath))
             {
@@ -84,7 +87,9 @@ namespace MacBookEco.App
                 {
                     ProcessStartInfo startInfo = new ProcessStartInfo();
                     startInfo.FileName = _executablePath;
-                    startInfo.Arguments = FixedArguments(command);
+                    startInfo.Arguments = FixedArguments(
+                        command,
+                        experimentalAcknowledgementToken);
                     startInfo.WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory;
                     startInfo.UseShellExecute = true;
                     startInfo.Verb = "runas";
@@ -161,24 +166,63 @@ namespace MacBookEco.App
             }
         }
 
-        internal static string FixedArguments(AdminCommand command)
+        internal static string FixedArguments(
+            AdminCommand command,
+            string experimentalAcknowledgementToken = null)
         {
             switch (command)
             {
                 case AdminCommand.InstallDisplay:
+                    RequireNoAcknowledgementToken(
+                        experimentalAcknowledgementToken);
                     return "install-display";
+                case AdminCommand.InstallExperimentalDisplay:
+                    Sha256Digest parsed;
+                    if (!Sha256Digest.TryParseCanonical(
+                            experimentalAcknowledgementToken,
+                            out parsed))
+                    {
+                        throw new InvalidOperationException(
+                            "The experimental helper command requires one "
+                                + "canonical acknowledgement token.");
+                    }
+
+                    // Canonical uppercase hex contains no quoting or command-
+                    // line metacharacters. It can only restrict the helper's
+                    // freshly generated choice; it cannot supply EDID bytes.
+                    return "install-experimental-display " +
+                        parsed.ToString();
                 case AdminCommand.RemoveDisplay:
+                    RequireNoAcknowledgementToken(
+                        experimentalAcknowledgementToken);
                     return "remove-display";
                 case AdminCommand.ApplyPowerNormal:
+                    RequireNoAcknowledgementToken(
+                        experimentalAcknowledgementToken);
                     return "apply-power normal";
                 case AdminCommand.ApplyPowerCool:
+                    RequireNoAcknowledgementToken(
+                        experimentalAcknowledgementToken);
                     return "apply-power cool";
                 case AdminCommand.ApplyPowerBattery:
+                    RequireNoAcknowledgementToken(
+                        experimentalAcknowledgementToken);
                     return "apply-power battery";
                 case AdminCommand.RestorePower:
+                    RequireNoAcknowledgementToken(
+                        experimentalAcknowledgementToken);
                     return "restore-power";
                 default:
                     throw new InvalidOperationException("Unknown fixed helper command.");
+            }
+        }
+
+        private static void RequireNoAcknowledgementToken(string value)
+        {
+            if (value != null)
+            {
+                throw new InvalidOperationException(
+                    "This fixed helper command accepts no acknowledgement token.");
             }
         }
 

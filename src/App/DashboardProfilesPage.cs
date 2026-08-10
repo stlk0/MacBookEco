@@ -198,7 +198,7 @@ namespace MacBookEco.App
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46.0f));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 1.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 72.0f));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96.0f));
 
             layout.Controls.Add(DashboardTheme.CreateSectionTitle("Display"), 0, 0);
             DisplayCurrent = DashboardTheme.CreateBodyLabel(
@@ -239,7 +239,7 @@ namespace MacBookEco.App
             Label supportTitle = DashboardTheme.CreateCaptionLabel("48 Hz mode setup");
             supportTitle.Font = DashboardTheme.CaptionStrongFont;
             support.Controls.Add(supportTitle, 0, 0);
-            DisplayState = DashboardTheme.CreateCaptionLabel(
+            DisplayState = CreateWrappingCaption(
                 "MacBook Eco ownership: checking...");
             support.Controls.Add(DisplayState, 0, 1);
 

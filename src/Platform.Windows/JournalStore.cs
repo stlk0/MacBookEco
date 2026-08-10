@@ -133,7 +133,10 @@ namespace MacBookEco.Platform.Windows
                 if (current.Payload != null && next.Payload != null &&
                     (!current.Payload.Target.Equals(next.Payload.Target) ||
                      !current.Payload.OwnedOverrideHash.Equals(
-                        next.Payload.OwnedOverrideHash)))
+                        next.Payload.OwnedOverrideHash) ||
+                     !OptionalDigestEquals(
+                        current.Payload.SourceEdidSignature,
+                        next.Payload.SourceEdidSignature)))
                 {
                     throw new SecureStateConflictException(
                         "An EDID journal transition attempted to change durable ownership facts.");
@@ -147,6 +150,18 @@ namespace MacBookEco.Platform.Windows
                 throw new SecureStateConflictException(
                     "A new EDID operation cannot replace a non-terminal or conflicted journal.");
             }
+        }
+
+        private static bool OptionalDigestEquals(
+            Sha256Digest first,
+            Sha256Digest second)
+        {
+            if (first == null || second == null)
+            {
+                return first == null && second == null;
+            }
+
+            return first.Equals(second);
         }
 
         internal PowerJournal SavePower(PowerJournal journal)

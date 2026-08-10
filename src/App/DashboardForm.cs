@@ -184,10 +184,9 @@ namespace MacBookEco.App
         }
 
         /// <summary>
-        /// Names the reviewed profile that matched this machine, or says plainly
-        /// that none did. The profile ID is the only hardware fact the
-        /// presentation layer is given; the catalog turns it into the reviewed
-        /// display name without the dashboard reaching into the platform.
+        /// Names the reviewed profile that matched this machine, identifies an
+        /// experimental local candidate without exposing its generated ID, or
+        /// says plainly that neither is available.
         /// </summary>
         private void UpdateHardwareSummary(OptimizationStateSnapshot state)
         {
@@ -205,17 +204,25 @@ namespace MacBookEco.App
             }
             else
             {
-                DisplayProfile profile = ProfileCatalog.GetById(
-                    state.DisplayProfileId);
-                if (profile == null)
+                if (state.DisplayProfileExperimental)
                 {
-                    summary = "Unsupported hardware \u00b7 diagnostics only";
-                    color = DashboardTheme.SecondaryTextColor;
+                    summary = "Experimental 48 Hz candidate \u00b7 not verified";
+                    color = DashboardTheme.WarningColor;
                 }
                 else
                 {
-                    summary = profile.DisplayName;
-                    color = DashboardTheme.AccentColor;
+                    DisplayProfile profile = ProfileCatalog.GetById(
+                        state.DisplayProfileId);
+                    if (profile == null)
+                    {
+                        summary = "Unsupported hardware \u00b7 diagnostics only";
+                        color = DashboardTheme.SecondaryTextColor;
+                    }
+                    else
+                    {
+                        summary = profile.DisplayName;
+                        color = DashboardTheme.AccentColor;
+                    }
                 }
             }
 
@@ -253,7 +260,7 @@ namespace MacBookEco.App
                 _profilesController.OnCpuPresetChanged,
                 delegate { ApplyDisplayRefreshRate(48); },
                 delegate { ApplyDisplayRefreshRate(60); },
-                delegate { QueueCommand(OptimizationCommand.InstallDisplaySupport()); },
+                InstallDisplaySupport,
                 RemoveDisplaySupport,
                 ApplySelectedCpuPreset,
                 RestoreOriginalPower,
@@ -402,6 +409,28 @@ namespace MacBookEco.App
             {
                 QueueCommand(OptimizationCommand.RemoveDisplaySupport());
             }
+        }
+
+        private void InstallDisplaySupport()
+        {
+            OptimizationStateSnapshot state = _stateMonitor.Current;
+            string acknowledgementToken = null;
+            if (state != null && state.DisplayProfileExperimental &&
+                state.DisplayCandidateEligible)
+            {
+                acknowledgementToken =
+                    state.DisplayCandidateAcknowledgementToken;
+                if (string.IsNullOrEmpty(acknowledgementToken) ||
+                    !DestructiveConfirmation.InstallExperimentalDisplaySupport(
+                        this,
+                        state.DisplayCandidateSummary))
+                {
+                    return;
+                }
+            }
+
+            QueueCommand(OptimizationCommand.InstallDisplaySupport(
+                acknowledgementToken));
         }
 
         private void RestoreOriginalPower()

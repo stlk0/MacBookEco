@@ -270,6 +270,7 @@ namespace MacBookEco.Platform.Windows
     {
         private readonly MonitorDeviceRecord expectedRecord;
         private readonly byte[] baseEdid;
+        private readonly byte[] sourceEdid;
 
         private ResolvedMonitorTarget(
             MonitorDeviceRecord record,
@@ -280,6 +281,9 @@ namespace MacBookEco.Platform.Windows
         {
             expectedRecord = CopyRecord(record);
             baseEdid = parsedEdid.ToByteArray();
+            sourceEdid = record.Edid == null
+                ? null
+                : (byte[])record.Edid.Clone();
             DeviceInstanceId = record.DeviceInstanceId.Trim().ToUpperInvariant();
             HardwareId = HardwareSnapshot.NormalizePanelHardwareId(
                 record.HardwareId);
@@ -324,6 +328,10 @@ namespace MacBookEco.Platform.Windows
         internal uint RefreshRateDenominator { get; private set; }
 
         internal byte[] BaseEdid => (byte[])baseEdid.Clone();
+
+        internal byte[] SourceEdid => sourceEdid == null
+            ? null
+            : (byte[])sourceEdid.Clone();
 
         internal static ResolvedMonitorTarget FromRecord(
             MonitorDeviceRecord record,
@@ -456,14 +464,17 @@ namespace MacBookEco.Platform.Windows
         /// for treating an already-owned value as Installed rather than
         /// retrying this mutation.
         /// </summary>
-        internal void WriteOwnedOverride(byte[] expectedOverride)
+        internal void WriteOwnedOverride(
+            byte[] expectedOverride,
+            Sha256Digest expectedSourceEdidSignature = null)
         {
             RequireOverrideBytes(expectedOverride, "expectedOverride");
             try
             {
                 using (SafeRegistryHandle deviceKey = OpenParameters(
                     DisplayTopologyNativeMethods.KEY_READ |
-                        NativeMethods.KEY_WRITE))
+                        NativeMethods.KEY_WRITE,
+                    expectedSourceEdidSignature))
                 {
                     byte[] current = EdidOverrideRegistry.Read(deviceKey);
                     if (current != null)
@@ -515,11 +526,14 @@ namespace MacBookEco.Platform.Windows
             }
         }
 
-        private SafeRegistryHandle OpenParameters(int registryAccess)
+        private SafeRegistryHandle OpenParameters(
+            int registryAccess,
+            Sha256Digest expectedSourceEdidSignature = null)
         {
             return MonitorDevnodeAccess.OpenExactDeviceParameters(
                 expectedRecord,
-                registryAccess);
+                registryAccess,
+                expectedSourceEdidSignature);
         }
 
         private static MonitorDeviceRecord CopyRecord(MonitorDeviceRecord source)

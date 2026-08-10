@@ -38,6 +38,7 @@ foreach ($required in @(
 
 foreach ($forbidden in @(
         'install-display',
+        'install-experimental-display',
         'remove-display',
         '/setactive',
         'PowerSetActiveScheme',
@@ -52,4 +53,3 @@ foreach ($forbidden in @(
 }
 
 Write-Host 'Hardware acceptance harness audit passed.'
-

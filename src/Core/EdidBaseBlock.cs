@@ -60,6 +60,8 @@ namespace MacBookEco.Core
 
         public byte ExtensionBlockCount => _bytes[126];
 
+        public bool DeclaresPreferredTiming => (_bytes[24] & 0x02) != 0;
+
         /// <summary>
         /// These bytes were validated when this block was constructed and are
         /// never mutated afterwards, so the signature is computed once. It
@@ -241,6 +243,119 @@ namespace MacBookEco.Core
             return sum == 0;
         }
 
+        public static bool HasValidCompleteDocument(byte[] value)
+        {
+            if (value == null || value.Length < Length || value.Length % Length != 0)
+            {
+                return false;
+            }
+
+            int extensionCount = value[126];
+            if (value.Length != (extensionCount + 1) * Length)
+            {
+                return false;
+            }
+
+            byte[] baseBlock = new byte[Length];
+            Buffer.BlockCopy(value, 0, baseBlock, 0, baseBlock.Length);
+            // EDID 1.3 requires descriptor forms (including range limits)
+            // that this deliberately small validator does not parse. A
+            // checksum-correct but only partially understood document is not
+            // sufficient evidence for experimental timing generation.
+            if (baseBlock[18] != 1 || baseBlock[19] != 4)
+            {
+                return false;
+            }
+
+            if (!HasSupportedBaseEncoding(baseBlock))
+            {
+                return false;
+            }
+
+            // EDID 1.4 requires descriptor zero to be a detailed timing.
+            // The generator additionally requires feature bit one to declare
+            // that timing as native/preferred for this panel.
+            if (baseBlock[FirstDescriptorOffset] == 0 &&
+                baseBlock[FirstDescriptorOffset + 1] == 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                EdidBaseBlock parsedBase = new EdidBaseBlock(baseBlock);
+                // ManufacturerCode is decoded lazily. Force every semantic
+                // field consumed by the generator to be validated here.
+                if (string.IsNullOrEmpty(parsedBase.HardwareId))
+                {
+                    return false;
+                }
+
+                if (!HasValidMonitorDescriptors(baseBlock))
+                {
+                    return false;
+                }
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+
+            int ctaCapabilityFlags = -1;
+            for (int blockIndex = 1; blockIndex <= extensionCount; blockIndex++)
+            {
+                int sum = 0;
+                int blockOffset = blockIndex * Length;
+                for (int index = 0; index < Length; index++)
+                {
+                    sum = (sum + value[blockOffset + index]) & 0xFF;
+                }
+
+                if (sum != 0)
+                {
+                    return false;
+                }
+
+                if (!HasSupportedExtensionStructure(value, blockOffset))
+                {
+                    return false;
+                }
+
+                int currentCtaCapabilityFlags = value[blockOffset + 3];
+                if (ctaCapabilityFlags >= 0 &&
+                    ctaCapabilityFlags != currentCtaCapabilityFlags)
+                {
+                    return false;
+                }
+
+                ctaCapabilityFlags = currentCtaCapabilityFlags;
+            }
+
+            return true;
+        }
+
+        public static Sha256Digest ComputeNormalizedDocumentSignature(
+            byte[] value)
+        {
+            if (!HasValidCompleteDocument(value))
+            {
+                throw new FormatException(
+                    "The complete EDID document is invalid or unsupported.");
+            }
+
+            byte[] normalized = (byte[])value.Clone();
+            NormalizeBaseIdentity(normalized);
+            return Sha256Digest.Compute(normalized);
+        }
+
         public static void UpdateChecksum(byte[] value)
         {
             if (value == null)
@@ -267,6 +382,12 @@ namespace MacBookEco.Core
 
         private static Sha256Digest NormalizeAndHash(byte[] normalized)
         {
+            NormalizeBaseIdentity(normalized);
+            return Sha256Digest.Compute(normalized);
+        }
+
+        private static void NormalizeBaseIdentity(byte[] normalized)
+        {
             // Serial number and manufacturing week/year vary between otherwise
             // identical panels and are not part of a reviewed timing profile.
             for (var index = 12; index <= 17; index++)
@@ -274,8 +395,10 @@ namespace MacBookEco.Core
                 normalized[index] = 0;
             }
 
-            // Only the preferred native DTD participates in the signature.
-            // Text descriptors and the application-added secondary DTD do not.
+            // Only the preferred base-block DTD participates from the base
+            // descriptor area. Text descriptors and the application-added
+            // secondary DTD do not; complete-document extension bytes remain
+            // part of the document signature.
             for (
                 var index = FirstDescriptorOffset + DetailedTiming.EncodedLength;
                 index < 126;
@@ -285,7 +408,280 @@ namespace MacBookEco.Core
             }
 
             normalized[127] = 0;
-            return Sha256Digest.Compute(normalized);
+        }
+
+        private static bool HasSupportedExtensionStructure(
+            byte[] document,
+            int offset)
+        {
+            // The restricted generator accepts only CTA extension blocks. An
+            // unfamiliar checksum-correct extension is not enough evidence
+            // that the complete source document was parsed correctly.
+            if (document[offset] != 0x02)
+            {
+                return false;
+            }
+
+            int revision = document[offset + 1];
+            int detailedTimingOffset = document[offset + 2];
+            // CTA revisions 1 and 2 have legacy/deprecated semantics that are
+            // unnecessary for the exact modern-panel allowlist. Accept only
+            // revision 3 rather than interpreting their shared-looking fields
+            // under revision-3 rules.
+            if (revision != 3)
+            {
+                return false;
+            }
+
+            if (detailedTimingOffset == 0)
+            {
+                return (document[offset + 3] & 0x0F) == 0 &&
+                    IsZeroRange(document, offset + 4, offset + 127);
+            }
+
+            if (detailedTimingOffset < 4 || detailedTimingOffset > 127)
+            {
+                return false;
+            }
+
+            int detailedTimingStart = offset + detailedTimingOffset;
+            // CTA data blocks have many revision- and tag-specific semantic
+            // constraints. The restricted generator does not need them, so a
+            // nonempty collection remains unsupported instead of receiving a
+            // shallow structural check that could bless malformed payloads.
+            if (detailedTimingStart != offset + 4)
+            {
+                return false;
+            }
+
+            int descriptorIndex = detailedTimingStart;
+            int descriptorEnd = offset + 127;
+            int detailedTimingCount = 0;
+            while (descriptorIndex + DetailedTiming.EncodedLength <=
+                descriptorEnd)
+            {
+                if (document[descriptorIndex] == 0 &&
+                    document[descriptorIndex + 1] == 0)
+                {
+                    return (document[offset + 3] & 0x0F) <=
+                            detailedTimingCount &&
+                        IsZeroRange(
+                            document,
+                            descriptorIndex,
+                            descriptorEnd);
+                }
+
+                try
+                {
+                    DetailedTiming.Parse(document, descriptorIndex);
+                }
+                catch (FormatException)
+                {
+                    return false;
+                }
+
+                detailedTimingCount++;
+                descriptorIndex += DetailedTiming.EncodedLength;
+            }
+
+            int declaredNativeTimingCount = document[offset + 3] & 0x0F;
+            return declaredNativeTimingCount <= detailedTimingCount &&
+                IsZeroRange(document, descriptorIndex, descriptorEnd);
+        }
+
+        private static bool IsZeroRange(byte[] value, int start, int endExclusive)
+        {
+            for (int index = start; index < endExclusive; index++)
+            {
+                if (value[index] != 0)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasValidMonitorDescriptors(byte[] baseBlock)
+        {
+            bool monitorDescriptorSeen = false;
+            for (int descriptorIndex = 0;
+                descriptorIndex < DescriptorCount;
+                descriptorIndex++)
+            {
+                int offset = GetDescriptorOffset(descriptorIndex);
+                if (baseBlock[offset] != 0 || baseBlock[offset + 1] != 0)
+                {
+                    // Base-block DTDs must precede monitor descriptors.
+                    if (monitorDescriptorSeen)
+                    {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                if (IsZeroRange(
+                        baseBlock,
+                        offset,
+                        offset + DetailedTiming.EncodedLength))
+                {
+                    // EDID data-fill must use the defined 10h dummy
+                    // descriptor. An all-zero base descriptor is not valid.
+                    return false;
+                }
+
+                monitorDescriptorSeen = true;
+
+                if (baseBlock[offset + 2] != 0)
+                {
+                    return false;
+                }
+
+                byte tag = baseBlock[offset + 3];
+                if (tag == 0x10)
+                {
+                    if (!IsZeroRange(
+                            baseBlock,
+                            offset + 4,
+                            offset + DetailedTiming.EncodedLength))
+                    {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                if (baseBlock[offset + 4] != 0 ||
+                    !IsSupportedMonitorDescriptorTag(tag))
+                {
+                    return false;
+                }
+
+                if (tag == 0xFC || tag == 0xFE || tag == 0xFF)
+                {
+                    bool terminated = false;
+                    for (int index = offset + 5;
+                        index < offset + DetailedTiming.EncodedLength;
+                        index++)
+                    {
+                        byte value = baseBlock[index];
+                        if (terminated)
+                        {
+                            if (value != 0x20)
+                            {
+                                return false;
+                            }
+
+                            continue;
+                        }
+
+                        if (value == 0x0A)
+                        {
+                            terminated = true;
+                        }
+                        else if (value < 0x20 || value > 0x7E)
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasSupportedBaseEncoding(byte[] baseBlock)
+        {
+            // Bit 15 of the big-endian PNP manufacturer word is reserved.
+            if ((baseBlock[8] & 0x80) != 0)
+            {
+                return false;
+            }
+
+            byte manufactureWeek = baseBlock[16];
+            if ((manufactureWeek > 0x36 && manufactureWeek != 0xFF) ||
+                baseBlock[17] < 0x10)
+            {
+                return false;
+            }
+
+            byte videoInput = baseBlock[20];
+            bool digital = (videoInput & 0x80) != 0;
+            // The runtime allowlist contains only digital internal panels. An
+            // analog declaration is a valid EDID form but is unsupported here
+            // rather than receiving a partial analog-signal validation.
+            if (!digital)
+            {
+                return false;
+            }
+
+            int colorBitDepth = (videoInput >> 4) & 0x07;
+            int interfaceType = videoInput & 0x0F;
+            if (colorBitDepth == 0x07 || interfaceType > 0x05)
+            {
+                return false;
+            }
+
+            // FF delegates gamma to an extension type that this validator does
+            // not accept. Likewise, validating the standard-sRGB declaration
+            // requires an exact chromaticity tuple; keep that form outside the
+            // deliberately narrow generator subset for now.
+            if (baseBlock[23] == 0xFF || (baseBlock[24] & 0x04) != 0)
+            {
+                return false;
+            }
+
+            // EDID 1.4 feature bit zero declares a continuous-frequency
+            // display and requires a range-limits descriptor. Range limits
+            // remain outside this restricted parser, so that form fails
+            // closed instead of being only partially validated.
+            if ((baseBlock[24] & 0x01) != 0)
+            {
+                return false;
+            }
+
+            // Bit seven is the defined Apple Macintosh II 1152x870 timing.
+            // The lower manufacturer-specific timing bits have no portable
+            // semantics for this restricted parser, so they fail closed.
+            if ((baseBlock[37] & 0x7F) != 0)
+            {
+                return false;
+            }
+
+            for (int offset = 38; offset < 54; offset += 2)
+            {
+                byte horizontalCode = baseBlock[offset];
+                byte shapeAndRefresh = baseBlock[offset + 1];
+                bool unused = horizontalCode == 0x01 &&
+                    shapeAndRefresh == 0x01;
+                if (unused)
+                {
+                    continue;
+                }
+
+                // 00 is reserved. 01 is also the minimum valid 256-pixel
+                // code when it is not the canonical 01/01 unused pair.
+                if (horizontalCode == 0x00)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IsSupportedMonitorDescriptorTag(byte tag)
+        {
+            switch (tag)
+            {
+                case 0xFC:
+                case 0xFE:
+                case 0xFF:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private static int GetDescriptorOffset(int descriptorIndex)

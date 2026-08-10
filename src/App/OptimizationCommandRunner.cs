@@ -22,13 +22,16 @@ namespace MacBookEco.App
             int refreshRateHz,
             PowerPreset? cpuPreset,
             bool includesDisplayStep,
-            string displayName)
+            string displayName,
+            string experimentalAcknowledgementToken)
         {
             Kind = kind;
             RefreshRateHz = refreshRateHz;
             CpuPreset = cpuPreset;
             IncludesDisplayStep = includesDisplayStep;
             DisplayName = displayName ?? string.Empty;
+            ExperimentalAcknowledgementToken =
+                experimentalAcknowledgementToken;
         }
 
         public OptimizationCommandKind Kind { get; private set; }
@@ -36,6 +39,10 @@ namespace MacBookEco.App
         public PowerPreset? CpuPreset { get; private set; }
         public bool IncludesDisplayStep { get; private set; }
         public string DisplayName { get; private set; }
+        internal string ExperimentalAcknowledgementToken {
+            get;
+            private set;
+        }
 
         public static OptimizationCommand SetDisplayRefreshRate(int refreshRateHz)
         {
@@ -44,17 +51,20 @@ namespace MacBookEco.App
                 refreshRateHz,
                 null,
                 true,
-                string.Empty);
+                string.Empty,
+                null);
         }
 
-        public static OptimizationCommand InstallDisplaySupport()
+        public static OptimizationCommand InstallDisplaySupport(
+            string experimentalAcknowledgementToken = null)
         {
             return new OptimizationCommand(
                 OptimizationCommandKind.InstallDisplaySupport,
                 0,
                 null,
                 false,
-                string.Empty);
+                string.Empty,
+                experimentalAcknowledgementToken);
         }
 
         public static OptimizationCommand RemoveDisplaySupport()
@@ -64,7 +74,8 @@ namespace MacBookEco.App
                 0,
                 null,
                 false,
-                string.Empty);
+                string.Empty,
+                null);
         }
 
         public static OptimizationCommand ApplyCpuPreset(PowerPreset preset)
@@ -74,7 +85,8 @@ namespace MacBookEco.App
                 0,
                 preset,
                 false,
-                string.Empty);
+                string.Empty,
+                null);
         }
 
         public static OptimizationCommand RestoreCpuPower()
@@ -84,7 +96,8 @@ namespace MacBookEco.App
                 0,
                 null,
                 false,
-                string.Empty);
+                string.Empty,
+                null);
         }
 
         public static OptimizationCommand ApplyCombinedProfile(
@@ -98,7 +111,8 @@ namespace MacBookEco.App
                 refreshRateHz,
                 preset,
                 includesDisplayStep,
-                displayName);
+                displayName,
+                null);
         }
     }
 
@@ -408,7 +422,8 @@ namespace MacBookEco.App
                         command.RefreshRateHz,
                         RequestDisplayConfirmation);
                 case OptimizationCommandKind.InstallDisplaySupport:
-                    return _actions.InstallDisplaySupport();
+                    return _actions.InstallDisplaySupport(
+                        command.ExperimentalAcknowledgementToken);
                 case OptimizationCommandKind.RemoveDisplaySupport:
                     return _actions.RemoveDisplaySupport();
                 case OptimizationCommandKind.ApplyCpuPreset:
