@@ -39,13 +39,14 @@ delete a foreign or modified override.
 For an experimental install or install retry, the elevated helper reads the
 active hardware again and must reproduce the same model, live controlling GPU,
 panel ID, normalized complete source-EDID signature, native DTD, generator formula,
-and exact expected override. Offline removal also reproduces the model, the
-canonical GPU binding encoded by the profile ID, panel and timing facts,
-formula, and expected override, but does not require an active display-adapter
-route. This keeps exact-owned removal available when a driver or topology has
-failed. The durable monitor identity must still resolve uniquely, the journaled
-hash must match the recompiled override, and the live value must be byte-for-byte
-identical before deletion. The journal stores identity, a normalized complete
+deterministic descriptor placement, and exact expected override. Offline removal
+also reproduces the model, the canonical GPU binding encoded by the profile ID,
+panel and timing facts, formula, descriptor placement, and expected override,
+but does not require an active display-adapter route. This keeps exact-owned
+removal available when a driver or topology has failed. The durable monitor
+identity must still resolve uniquely, the journaled hash must match the
+recompiled override, and the live value must be byte-for-byte identical before
+deletion. The journal stores identity, a normalized complete
 source-EDID digest, and an owned-state hash—not EDID or DTD payloads. When the
 complete source document remains available, its digest must match. Recovery
 accepts a missing document only when Windows exposes exactly the journal-owned

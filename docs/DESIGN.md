@@ -81,8 +81,11 @@ width. All additional vertical blanking goes to the vertical back porch. It
 rejects rather than repairs a candidate if a DTD field is out of range, sync is
 not wholly inside blanking, arithmetic overflows, the encoded pixel clock is
 greater than native, or the encoded refresh differs from 48 Hz by more than
-0.01 Hz. Native 60 Hz stays the preferred descriptor; 48 Hz is inserted only in
-the free nonpreferred descriptor.
+0.01 Hz. Native 60 Hz stays preferred. A valid free dummy descriptor supplies
+capacity for 48 Hz; the compiler places the generated DTD after existing DTDs
+and before monitor descriptors, shifting intervening monitor-descriptor payloads
+right byte-for-byte as needed while preserving their relative order. Reviewed
+static profiles retain their legacy byte layout.
 
 An experimental profile ID is deterministic over the generator recipe version,
 model, canonical GPU vendor/device, panel ID, normalized complete source-EDID

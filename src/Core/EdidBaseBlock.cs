@@ -227,6 +227,78 @@ namespace MacBookEco.Core
             return new EdidBaseBlock(result);
         }
 
+        internal EdidBaseBlock InsertOrderedDetailedTiming(
+            DetailedTiming timing)
+        {
+            if (timing == null)
+            {
+                throw new ArgumentNullException(nameof(timing));
+            }
+
+            if (ContainsDetailedTiming(timing))
+            {
+                return new EdidBaseBlock(_bytes);
+            }
+
+            if (!IsDetailedTimingDescriptor(0))
+            {
+                throw new InvalidOperationException(
+                    "The preferred EDID descriptor is not a detailed timing.");
+            }
+
+            int freeDescriptorIndex = FindFreeDescriptor();
+            if (freeDescriptorIndex < 0)
+            {
+                throw new InvalidOperationException(
+                    "The EDID has no free non-preferred descriptor slot.");
+            }
+
+            int insertionIndex = -1;
+            for (int descriptorIndex = 1;
+                descriptorIndex < DescriptorCount;
+                descriptorIndex++)
+            {
+                if (IsDetailedTimingDescriptor(descriptorIndex))
+                {
+                    if (insertionIndex >= 0)
+                    {
+                        throw new InvalidOperationException(
+                            "Detailed timings must precede monitor descriptors.");
+                    }
+
+                    continue;
+                }
+
+                if (insertionIndex < 0)
+                {
+                    insertionIndex = descriptorIndex;
+                }
+            }
+
+            if (insertionIndex < 0 || freeDescriptorIndex < insertionIndex)
+            {
+                throw new InvalidOperationException(
+                    "The EDID descriptor layout cannot receive an ordered timing.");
+            }
+
+            var result = (byte[])_bytes.Clone();
+            for (int descriptorIndex = freeDescriptorIndex;
+                descriptorIndex > insertionIndex;
+                descriptorIndex--)
+            {
+                Buffer.BlockCopy(
+                    result,
+                    GetDescriptorOffset(descriptorIndex - 1),
+                    result,
+                    GetDescriptorOffset(descriptorIndex),
+                    DetailedTiming.EncodedLength);
+            }
+
+            timing.WriteTo(result, GetDescriptorOffset(insertionIndex));
+            UpdateChecksum(result);
+            return new EdidBaseBlock(result);
+        }
+
         public static bool HasValidChecksum(byte[] value)
         {
             if (value == null || value.Length != Length)
@@ -340,6 +412,27 @@ namespace MacBookEco.Core
             }
 
             return true;
+        }
+
+        internal static bool HasValidCompleteDocumentWithReplacementBase(
+            byte[] sourceDocument,
+            byte[] replacementBase)
+        {
+            if (!HasValidCompleteDocument(sourceDocument) ||
+                replacementBase == null ||
+                replacementBase.Length != Length)
+            {
+                return false;
+            }
+
+            byte[] candidate = (byte[])sourceDocument.Clone();
+            Buffer.BlockCopy(
+                replacementBase,
+                0,
+                candidate,
+                0,
+                replacementBase.Length);
+            return HasValidCompleteDocument(candidate);
         }
 
         public static Sha256Digest ComputeNormalizedDocumentSignature(

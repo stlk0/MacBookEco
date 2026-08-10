@@ -24,6 +24,10 @@ namespace MacBookEco.Tests.Core
         private const string Exact48Dtd =
             "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A";
 
+        private const string ReviewedAppa044OwnedOverrideHash =
+            "02D510D988516D39C214DC5F404016AE" +
+            "444B78FED59C8C2D6D793FC7FABAF6E5";
+
         internal static TestCase[] CreateCases()
         {
             return new[]
@@ -40,6 +44,9 @@ namespace MacBookEco.Tests.Core
                 Test(
                     "Generated 48 Hz timing follows the bounded golden formula",
                     GeneratedTimingMatchesGoldenFormula),
+                Test(
+                    "Experimental override preserves EDID descriptor order",
+                    ExperimentalOverridePreservesDescriptorOrder),
                 Test(
                     "Generated pixel clock uses half-up rounding at 5000",
                     GeneratedPixelClockUsesHalfUpRounding),
@@ -240,6 +247,18 @@ namespace MacBookEco.Tests.Core
 
             var installed = selected.Profile.BuildOverride(hardware);
             Check.True(installed.ContainsDetailedTiming(selected.Profile.TargetTiming));
+            Check.BytesEqual(
+                hardware.Edid
+                    .InsertDetailedTiming(selected.Profile.TargetTiming)
+                    .ToByteArray(),
+                installed.ToByteArray());
+            Check.BytesEqual(
+                selected.Profile.TargetTiming.ToByteArray(),
+                installed.GetDetailedTiming(2).ToByteArray());
+            Check.Equal(
+                Sha256Digest.ParseCanonical(
+                    ReviewedAppa044OwnedOverrideHash),
+                Sha256Digest.Compute(installed.ToByteArray()));
 
             var otherDriver = new HardwareSnapshot(
                 "Apple Inc.",
@@ -315,6 +334,60 @@ namespace MacBookEco.Tests.Core
             Check.Equal(
                 target.VerticalBlanking - native.VerticalBlanking,
                 target.VerticalBackPorch - native.VerticalBackPorch);
+        }
+
+        private static void ExperimentalOverridePreservesDescriptorOrder()
+        {
+            byte[] sourceBytes = CreatePanelVariant(0xA045).ToByteArray();
+            SetOccupiedMonitorDescriptor(sourceBytes, 2, 0xFE);
+            EdidBaseBlock.UpdateChecksum(sourceBytes);
+            var source = new EdidBaseBlock(sourceBytes);
+            HardwareSnapshot hardware = CreateGeneratorHardware(source);
+            ExperimentalProfileGenerationResult generated =
+                Experimental48HzProfileGenerator.GenerateFallback(hardware);
+
+            Check.True(generated.Succeeded);
+            EdidBaseBlock owned = generated.Profile.BuildOverride(hardware);
+            Check.BytesEqual(
+                source.PreferredTiming.ToByteArray(),
+                owned.PreferredTiming.ToByteArray());
+            Check.BytesEqual(
+                generated.Profile.TargetTiming.ToByteArray(),
+                owned.GetDetailedTiming(1).ToByteArray());
+            Check.BytesEqual(
+                GetDescriptorBytes(source, 1),
+                GetDescriptorBytes(owned, 2));
+            Check.BytesEqual(
+                GetDescriptorBytes(source, 2),
+                GetDescriptorBytes(owned, 3));
+            byte[] ownedBytes = owned.ToByteArray();
+            for (int index = 0;
+                index < EdidBaseBlock.FirstDescriptorOffset;
+                index++)
+            {
+                Check.Equal(sourceBytes[index], ownedBytes[index]);
+            }
+            Check.Equal(sourceBytes[126], ownedBytes[126]);
+            Check.Equal(-1, owned.FindFreeDescriptor());
+            byte[] sourceDocument = CreateCompleteEdidDocument(source);
+            Check.True(
+                EdidBaseBlock.HasValidCompleteDocumentWithReplacementBase(
+                    sourceDocument,
+                    ownedBytes));
+            EdidBaseBlock unordered = source.InsertDetailedTiming(
+                generated.Profile.TargetTiming);
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocumentWithReplacementBase(
+                    sourceDocument,
+                    unordered.ToByteArray()));
+            Check.False(
+                EdidBaseBlock.HasValidCompleteDocumentWithReplacementBase(
+                    sourceDocument,
+                    new byte[EdidBaseBlock.Length - 1]));
+            Check.BytesEqual(
+                owned.ToByteArray(),
+                generated.Profile.CompileOverride(owned).ToByteArray());
+            Check.BytesEqual(sourceBytes, source.ToByteArray());
         }
 
         private static void GeneratedPixelClockUsesHalfUpRounding()
@@ -959,8 +1032,17 @@ namespace MacBookEco.Tests.Core
             CheckGenerationRejected(CreateGeneratorHardware(
                 new EdidBaseBlock(occupied)));
 
-            EdidBaseBlock existingTarget = CreateOriginal().InsertDetailedTiming(
-                DetailedTiming.ParseHex(Exact48Dtd));
+            HardwareSnapshot existingTargetHardware =
+                CreateGeneratorHardware(CreateOriginal());
+            ExperimentalProfileGenerationResult existingTargetProfile =
+                Experimental48HzProfileGenerator.Generate(
+                    existingTargetHardware);
+            Check.True(existingTargetProfile.Succeeded);
+            EdidBaseBlock existingTarget =
+                existingTargetProfile.Profile.BuildOverride(
+                    existingTargetHardware);
+            Check.True(EdidBaseBlock.HasValidCompleteDocument(
+                CreateCompleteEdidDocument(existingTarget)));
             CheckGenerationRejected(CreateGeneratorHardware(existingTarget));
         }
 
@@ -1005,7 +1087,10 @@ namespace MacBookEco.Tests.Core
 
         private static void GeneratedRecoveryReprovesIdentity()
         {
-            EdidBaseBlock original = CreatePanelVariant(0xA045);
+            byte[] originalBytes = CreatePanelVariant(0xA045).ToByteArray();
+            SetOccupiedMonitorDescriptor(originalBytes, 2, 0xFE);
+            EdidBaseBlock.UpdateChecksum(originalBytes);
+            EdidBaseBlock original = new EdidBaseBlock(originalBytes);
             ExperimentalProfileGenerationResult generated =
                 Experimental48HzProfileGenerator.Generate(
                     CreateGeneratorHardware(original));
@@ -1029,11 +1114,12 @@ namespace MacBookEco.Tests.Core
                     original,
                     null).Succeeded);
 
-            byte[] ownedBytes = original.InsertDetailedTiming(
-                generated.Profile.TargetTiming).ToByteArray();
-            SetOccupiedMonitorDescriptor(ownedBytes, 3, 0xFE);
-            EdidBaseBlock.UpdateChecksum(ownedBytes);
+            byte[] ownedBytes = generated.Profile
+                .CompileOverride(original)
+                .ToByteArray();
             EdidBaseBlock ownedWithoutFreeSlot = new EdidBaseBlock(ownedBytes);
+            Check.True(EdidBaseBlock.HasValidCompleteDocument(
+                CreateCompleteEdidDocument(ownedWithoutFreeSlot)));
             Check.Equal(-1, ownedWithoutFreeSlot.FindFreeDescriptor());
             Check.True(
                 ownedWithoutFreeSlot.ContainsDetailedTiming(
@@ -1050,6 +1136,11 @@ namespace MacBookEco.Tests.Core
             Check.BytesEqual(
                 generated.Profile.TargetTiming.ToByteArray(),
                 ownedRecovery.Profile.TargetTiming.ToByteArray());
+            Check.BytesEqual(
+                ownedWithoutFreeSlot.ToByteArray(),
+                ownedRecovery.Profile
+                    .CompileOverride(ownedWithoutFreeSlot)
+                    .ToByteArray());
             CheckGenerationRejected(CreateGeneratorHardware(
                 ownedWithoutFreeSlot));
 
@@ -1114,8 +1205,9 @@ namespace MacBookEco.Tests.Core
                     CreateGeneratorHardware(original));
             Check.True(generated.Succeeded);
 
-            byte[] ownedOverride = original.InsertDetailedTiming(
-                generated.Profile.TargetTiming).ToByteArray();
+            byte[] ownedOverride = generated.Profile
+                .CompileOverride(original)
+                .ToByteArray();
             var target = new EdidTargetIdentity(
                 generated.Profile.Id,
                 "DISPLAY\\APPA045\\4&REDACTED&0&UID0000",
@@ -2263,6 +2355,8 @@ namespace MacBookEco.Tests.Core
         private static HardwareSnapshot CreateGeneratorHardware(
             EdidBaseBlock edid)
         {
+            bool completeEdidIsValid = EdidBaseBlock.HasValidCompleteDocument(
+                CreateCompleteEdidDocument(edid));
             return CreateGeneratorHardware(
                 edid,
                 "Apple Inc.",
@@ -2270,7 +2364,7 @@ namespace MacBookEco.Tests.Core
                 true,
                 edid.HardwareId,
                 "PCI\\VEN_1002&DEV_7340&SUBSYS_REDACTED",
-                true);
+                completeEdidIsValid);
         }
 
         private static HardwareSnapshot CreateGeneratorHardware(
@@ -2462,6 +2556,27 @@ namespace MacBookEco.Tests.Core
         private static EdidBaseBlock CreateOriginal()
         {
             return EdidBaseBlock.ParseHex(ReviewedAppa044Edid);
+        }
+
+        private static byte[] GetDescriptorBytes(
+            EdidBaseBlock edid,
+            int descriptorIndex)
+        {
+            if (edid == null)
+            {
+                throw new ArgumentNullException(nameof(edid));
+            }
+
+            byte[] source = edid.ToByteArray();
+            var descriptor = new byte[DetailedTiming.EncodedLength];
+            Buffer.BlockCopy(
+                source,
+                EdidBaseBlock.FirstDescriptorOffset +
+                    (descriptorIndex * DetailedTiming.EncodedLength),
+                descriptor,
+                0,
+                descriptor.Length);
+            return descriptor;
         }
 
         private static void SetOccupiedMonitorDescriptor(

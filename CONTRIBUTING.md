@@ -41,7 +41,11 @@ source gate, 0.01-Hz maximum target error, exact integer formula, complete
 hardware and topology gates, and deterministic identity. Add compiled behavior
 tests for accepted math, every rejection boundary, static-profile priority,
 recovery regeneration, exact ownership, and risk-confirmation cancellation.
-Declining the experimental warning must invoke no helper or mutation.
+Generated overrides must keep native timing preferred, place all DTDs before
+monitor descriptors, preserve shifted monitor-descriptor payloads byte-for-byte,
+and retain their relative order. Reviewed profile output must remain
+byte-compatible. Declining the experimental warning must invoke no helper or
+mutation.
 
 Admin helper commands remain fixed. Reviewed install and removal are
 argument-free. Experimental install carries only a canonical 64-hex token that

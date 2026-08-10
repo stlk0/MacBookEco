@@ -47,8 +47,10 @@ are proven at the same time:
 
 The candidate preserves the native active dimensions, horizontal timing,
 physical dimensions, borders, flags, vertical front porch, and vertical sync
-width. Native 60 Hz remains preferred; 48 Hz is added only to the free
-descriptor. Failure of any check leaves the machine read-only.
+width. Native 60 Hz remains preferred. One free dummy descriptor supplies the
+capacity for 48 Hz; existing monitor-descriptor payloads may move to later slots
+so every DTD remains before them, but their bytes and relative order are
+preserved. Failure of any check leaves the machine read-only.
 
 The best-effort model, GPU, panel, and timing evidence is maintained separately
 in the [Intel dGPU MacBook research catalog](docs/INTEL_DGPU_MACBOOK_CATALOG.md).

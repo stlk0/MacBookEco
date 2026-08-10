@@ -264,7 +264,19 @@ namespace MacBookEco.Core
                     "The matching EDID cannot safely receive the owned override.");
             }
 
-            return hardware.Edid.InsertDetailedTiming(TargetTiming);
+            return CompileOverride(hardware.Edid);
+        }
+
+        internal EdidBaseBlock CompileOverride(EdidBaseBlock baseEdid)
+        {
+            if (baseEdid == null)
+            {
+                throw new ArgumentNullException(nameof(baseEdid));
+            }
+
+            return IsExperimental
+                ? baseEdid.InsertOrderedDetailedTiming(TargetTiming)
+                : baseEdid.InsertDetailedTiming(TargetTiming);
         }
 
         private bool ContainsSystemModel(string value)

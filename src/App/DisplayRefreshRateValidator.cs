@@ -158,8 +158,8 @@ namespace MacBookEco.App
 
                     byte[] currentOverride =
                         hardware.InternalDisplay.ExistingEdidOverride;
-                    byte[] expectedOverride = coreHardware.Edid
-                        .InsertDetailedTiming(profile.TargetTiming)
+                    byte[] expectedOverride = profile
+                        .CompileOverride(coreHardware.Edid)
                         .ToByteArray();
                     if (!FixedTimeComparer.AreEqual(
                             currentOverride,

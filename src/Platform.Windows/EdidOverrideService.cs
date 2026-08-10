@@ -196,6 +196,10 @@ namespace MacBookEco.Platform.Windows
             ValidateInstallPreconditions(snapshot, hardware, profile);
 
             byte[] expectedOverride = CompileOwnedOverride(profile, target);
+            ValidateCompiledExperimentalDocument(
+                profile,
+                target,
+                expectedOverride);
             EdidJournalPayload payload = new EdidJournalPayload(
                 target.CreateIdentity(profile.Id),
                 Sha256Digest.Compute(expectedOverride),
@@ -597,6 +601,27 @@ namespace MacBookEco.Platform.Windows
             }
         }
 
+        private static void ValidateCompiledExperimentalDocument(
+            DisplayProfile profile,
+            ResolvedMonitorTarget target,
+            byte[] expectedOverride)
+        {
+            if (profile == null || !profile.IsExperimental)
+            {
+                return;
+            }
+
+            byte[] sourceDocument = target == null ? null : target.SourceEdid;
+            if (!EdidBaseBlock
+                    .HasValidCompleteDocumentWithReplacementBase(
+                        sourceDocument,
+                        expectedOverride))
+            {
+                throw new SecureStateConflictException(
+                    "The compiled experimental override is not a valid complete EDID.");
+            }
+        }
+
         private static void ValidateRecoverySourceDocument(
             EdidJournal journal,
             ResolvedMonitorTarget target)
@@ -804,7 +829,7 @@ namespace MacBookEco.Platform.Windows
                 throw new ArgumentNullException(profile == null ? "profile" : "target");
 
             EdidBaseBlock baseEdid = new EdidBaseBlock(target.BaseEdid);
-            return baseEdid.InsertDetailedTiming(profile.TargetTiming).ToByteArray();
+            return profile.CompileOverride(baseEdid).ToByteArray();
         }
 
         private static void VerifyJournaledOwnershipHash(
