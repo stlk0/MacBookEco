@@ -1,0 +1,522 @@
+using System;
+using System.Drawing;
+using System.Globalization;
+using System.Windows.Forms;
+using MacBookEco.AppPolicy;
+using MacBookEco.Telemetry;
+
+namespace MacBookEco.App
+{
+    // Keeps profile-selection state and turns telemetry/action state into the
+    // view data rendered by DashboardProfilesPage. It deliberately performs no
+    // mutations; the dashboard shell remains the action coordinator.
+    public sealed class DashboardProfilesController
+    {
+        private readonly object _customProfileItem;
+        private DashboardProfilesPage _page;
+
+        // Never null. Attach runs from the dashboard constructor, long before
+        // the first telemetry sample arrives, and every presentation path below
+        // asks the current display whether it is at 48 or 60 Hz.
+        private DisplayTelemetry _display =
+            DisplayTelemetry.Unavailable("Waiting for the first sample.");
+        private OptimizationStateSnapshot _optimizationState;
+        private bool _synchronizingSelections;
+        private bool _profileSelectionDirty;
+        private bool _cpuSelectionDirty;
+        private bool _mutationControlsEnabled = true;
+        private bool? _last48Active;
+        private bool? _last60Active;
+
+        public DashboardProfilesController(object customProfileItem)
+        {
+            if (customProfileItem == null)
+            {
+                throw new ArgumentNullException(nameof(customProfileItem));
+            }
+
+            _customProfileItem = customProfileItem;
+        }
+
+        public void Attach(DashboardProfilesPage page)
+        {
+            if (page == null)
+            {
+                throw new ArgumentNullException(nameof(page));
+            }
+
+            _page = page;
+            ApplyDisplaySupportPresentation();
+            UpdateRecommendedApplyEnabled();
+        }
+
+        public void UpdateDisplay(DisplayTelemetry display)
+        {
+            if (display != null)
+            {
+                _display = display;
+            }
+
+            if (_page == null)
+            {
+                return;
+            }
+
+            string currentModeText = "Current mode: " + DisplayModeText(_display);
+            if (!string.Equals(
+                _page.DisplayCurrent.Text,
+                currentModeText,
+                StringComparison.Ordinal))
+            {
+                _page.DisplayCurrent.Text = currentModeText;
+            }
+            ApplyDisplaySupportPresentation();
+            UpdateCombinedProfileState();
+        }
+
+        public void UpdateOptimizationState(OptimizationStateSnapshot state)
+        {
+            _optimizationState = state;
+            if (_page == null)
+            {
+                return;
+            }
+
+            if (state == null || !state.Available)
+            {
+                _page.CpuState.Text = "Current plan: unavailable";
+                _page.CpuState.ForeColor = DashboardTheme.SecondaryTextColor;
+                ApplyDisplaySupportPresentation();
+                UpdateCombinedProfileState();
+                return;
+            }
+
+            if (state.CpuProfileActive && state.ActiveCpuPreset.HasValue)
+            {
+                PowerPresetDefinition definition = PowerPresetCatalog.Get(
+                    state.ActiveCpuPreset.Value);
+                _page.CpuState.Text = "Current plan: MacBook Eco "
+                    + definition.DisplayName
+                    + " (app-owned)";
+                _page.CpuState.ForeColor = DashboardTheme.SecondaryTextColor;
+                if (!_cpuSelectionDirty)
+                {
+                    SelectCpuPreset(state.ActiveCpuPreset.Value);
+                }
+            }
+            else
+            {
+                _page.CpuState.Text =
+                    "Current plan: original or user-selected Windows plan";
+                _page.CpuState.ForeColor = DashboardTheme.SecondaryTextColor;
+                if (!_cpuSelectionDirty)
+                {
+                    // No app-owned plan is active, so there is nothing for the
+                    // list to mirror. Leaving the last applied preset selected
+                    // would contradict the line directly above it, which is
+                    // what a restore used to look like.
+                    ClearCpuSelection();
+                }
+            }
+
+            ApplyDisplaySupportPresentation();
+            UpdateCombinedProfileState();
+        }
+
+        public void ResetProfileSelection()
+        {
+            _profileSelectionDirty = false;
+        }
+
+        public void ResetAllSelections()
+        {
+            _profileSelectionDirty = false;
+            _cpuSelectionDirty = false;
+        }
+
+        public PowerPreset? SelectedCpuPreset()
+        {
+            if (_page == null)
+            {
+                return null;
+            }
+
+            return _page.CpuPreset.SelectedItem is PowerPreset
+                ? (PowerPreset?)_page.CpuPreset.SelectedItem
+                : null;
+        }
+
+        public OptimizationProfileDefinition SelectedRecommendedProfile()
+        {
+            return _page == null
+                ? null
+                : _page.RecommendedProfile.SelectedItem
+                    as OptimizationProfileDefinition;
+        }
+
+        public bool IsSelectedRefreshRate(double refreshRate)
+        {
+            return _display.IsRefreshRate(refreshRate);
+        }
+
+        public void SetControlsEnabled(bool enabled)
+        {
+            if (_page == null)
+            {
+                return;
+            }
+
+            _mutationControlsEnabled = enabled;
+            ApplyDisplaySupportPresentation();
+            _page.CpuApplyButton.Enabled = enabled;
+            _page.CpuRestoreButton.Enabled = enabled;
+            UpdateRecommendedApplyEnabled();
+            _page.CpuPreset.Enabled = enabled;
+            _page.RecommendedProfile.Enabled = enabled;
+        }
+
+        public void OnRecommendedProfileChanged(object sender, EventArgs eventArgs)
+        {
+            if (_page == null)
+            {
+                return;
+            }
+
+            bool custom = ReferenceEquals(
+                _page.RecommendedProfile.SelectedItem,
+                _customProfileItem);
+            if (!_synchronizingSelections)
+            {
+                _profileSelectionDirty = !custom;
+            }
+
+            OptimizationProfileDefinition profile = SelectedRecommendedProfile();
+            if (profile == null)
+            {
+                _page.RecommendedDescription.Text =
+                    "The current display and CPU settings do not exactly match "
+                    + "a named profile. Choose one below to replace both.";
+                UpdateRecommendedApplyEnabled();
+                return;
+            }
+
+            if (!_synchronizingSelections)
+            {
+                SelectCpuPreset(profile.CpuPreset);
+                _cpuSelectionDirty = true;
+            }
+
+            PowerPresetDefinition cpu = PowerPresetCatalog.Get(profile.CpuPreset);
+            _page.RecommendedDescription.Text = profile.Description
+                + Environment.NewLine
+                + "Display: "
+                + profile.DisplayRefreshRate
+                + " Hz. CPU: "
+                + cpu.DisplayName
+                + ".";
+            UpdateRecommendedApplyEnabled();
+        }
+
+        public void OnCpuPresetChanged(object sender, EventArgs eventArgs)
+        {
+            if (_page == null)
+            {
+                return;
+            }
+
+            if (!_synchronizingSelections)
+            {
+                _cpuSelectionDirty = true;
+            }
+
+            PowerPreset? preset = SelectedCpuPreset();
+            if (preset.HasValue)
+            {
+                _page.CpuDetails.SetPreset(preset.Value);
+            }
+        }
+
+        private void SelectCpuPreset(PowerPreset preset)
+        {
+            for (int index = 0; index < _page.CpuPreset.Items.Count; index++)
+            {
+                if (_page.CpuPreset.Items[index] is PowerPreset
+                    && (PowerPreset)_page.CpuPreset.Items[index] == preset)
+                {
+                    // The setter raises SelectedIndexChanged synchronously, so
+                    // the guard has to survive a handler that throws: leaving
+                    // it set would make every later user choice look like a
+                    // programmatic sync and be silently overwritten.
+                    _synchronizingSelections = true;
+                    try
+                    {
+                        _page.CpuPreset.SelectedIndex = index;
+                    }
+                    finally
+                    {
+                        _synchronizingSelections = false;
+                    }
+
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Clears the preset list without marking it as a user choice.  Uses
+        /// the same guard as SelectCpuPreset and for the same reason: the
+        /// setter raises SelectedIndexChanged synchronously, and a handler
+        /// that throws must not leave later user choices looking like a
+        /// programmatic sync.
+        /// </summary>
+        private void ClearCpuSelection()
+        {
+            _synchronizingSelections = true;
+            try
+            {
+                _page.CpuPreset.SelectedIndex = -1;
+            }
+            finally
+            {
+                _synchronizingSelections = false;
+            }
+        }
+
+        private void ApplyDisplaySupportPresentation()
+        {
+            if (_page == null)
+            {
+                return;
+            }
+
+            DisplaySupportUiState displayState = DisplaySupportUiPolicy.Evaluate(
+                _optimizationState,
+                _display.IsRefreshRate(48.0),
+                _mutationControlsEnabled);
+            SetDisplayButtonState(
+                _page.Display48Button,
+                "48 Hz Eco",
+                _display.IsRefreshRate(48.0),
+                displayState.CanSelect48Hz,
+                ref _last48Active);
+            SetDisplayButtonState(
+                _page.Display60Button,
+                "60 Hz Native",
+                _display.IsRefreshRate(60.0),
+                displayState.CanSelect60Hz,
+                ref _last60Active);
+            if (!string.Equals(
+                _page.DisplayState.Text,
+                displayState.SupportText,
+                StringComparison.Ordinal))
+            {
+                _page.DisplayState.Text = displayState.SupportText;
+            }
+
+            if (!string.Equals(
+                _page.InstallDisplayButton.Text,
+                displayState.InstallText,
+                StringComparison.Ordinal))
+            {
+                _page.InstallDisplayButton.Text = displayState.InstallText;
+            }
+
+            _page.InstallDisplayButton.AccessibleDescription =
+                displayState.CanInstall
+                    ? "Install or repair MacBook Eco 48 Hz support"
+                    : "48 Hz support cannot be installed in the current state";
+            if (_page.InstallDisplayButton.Enabled != displayState.CanInstall)
+            {
+                _page.InstallDisplayButton.Enabled = displayState.CanInstall;
+            }
+
+            if (_page.RemoveDisplayButton.Visible != displayState.ShowRemove)
+            {
+                _page.RemoveDisplayButton.Visible = displayState.ShowRemove;
+            }
+
+            _page.RemoveDisplayButton.AccessibleDescription =
+                displayState.CanRemove
+                    ? "Remove MacBook Eco-owned 48 Hz support"
+                    : "No MacBook Eco-owned 48 Hz support can be removed";
+            if (_page.RemoveDisplayButton.Enabled != displayState.CanRemove)
+            {
+                _page.RemoveDisplayButton.Enabled = displayState.CanRemove;
+            }
+
+            UpdateRecommendedApplyEnabled();
+        }
+
+        private void UpdateRecommendedApplyEnabled()
+        {
+            if (_page == null)
+            {
+                return;
+            }
+
+            OptimizationProfileDefinition profile = SelectedRecommendedProfile();
+            bool canUseProfileDisplay = profile == null
+                || profile.DisplayRefreshRate != 48
+                || DisplaySupportUiPolicy.Evaluate(
+                    _optimizationState,
+                    _display.IsRefreshRate(48.0),
+                    _mutationControlsEnabled).CanSelect48Hz;
+            _page.ApplyRecommendedButton.Enabled = _mutationControlsEnabled
+                && profile != null
+                && canUseProfileDisplay;
+        }
+
+        private void UpdateCombinedProfileState()
+        {
+            if (_page == null)
+            {
+                return;
+            }
+
+            OptimizationProfileDefinition active = FindActiveCombinedProfile();
+            string display = _display.RefreshRateHz.HasValue
+                ? _display.RefreshRateHz.Value.ToString(
+                    "0.###",
+                    CultureInfo.InvariantCulture) + " Hz"
+                : "display N/A";
+            string cpu = CurrentCpuProfileText();
+
+            _page.RecommendedCurrent.Text = active == null
+                ? "Current: Custom \u2014 " + display + " + " + cpu
+                : "Current: " + active.DisplayName + " \u2014 "
+                    + display + " + " + cpu;
+            _page.RecommendedCurrent.ForeColor = active == null
+                ? DashboardTheme.WarningColor
+                : DashboardTheme.AccentColor;
+
+            if (!_profileSelectionDirty)
+            {
+                SelectRecommendedProfile(
+                    active == null ? _customProfileItem : (object)active);
+            }
+        }
+
+        private OptimizationProfileDefinition FindActiveCombinedProfile()
+        {
+            if (_optimizationState == null
+                || !_optimizationState.Available
+                || !_optimizationState.CpuProfileActive
+                || !_optimizationState.ActiveCpuPreset.HasValue)
+            {
+                return null;
+            }
+
+            foreach (OptimizationProfileDefinition profile
+                in OptimizationProfileCatalog.Profiles)
+            {
+                if (profile.CpuPreset == _optimizationState.ActiveCpuPreset.Value
+                    && _display.IsRefreshRate(profile.DisplayRefreshRate))
+                {
+                    return profile;
+                }
+            }
+
+            return null;
+        }
+
+        private string CurrentCpuProfileText()
+        {
+            if (_optimizationState == null || !_optimizationState.Available)
+            {
+                return "CPU state N/A";
+            }
+
+            if (!_optimizationState.CpuProfileActive
+                || !_optimizationState.ActiveCpuPreset.HasValue)
+            {
+                return "Windows power plan";
+            }
+
+            return PowerPresetCatalog.SafeDisplayName(
+                _optimizationState.ActiveCpuPreset.Value) + " CPU";
+        }
+
+        private void SelectRecommendedProfile(object item)
+        {
+            if (ReferenceEquals(_page.RecommendedProfile.SelectedItem, item))
+            {
+                return;
+            }
+
+            _synchronizingSelections = true;
+            try
+            {
+                _page.RecommendedProfile.SelectedItem = item;
+            }
+            finally
+            {
+                _synchronizingSelections = false;
+            }
+        }
+
+        private static void SetDisplayButtonState(
+            Button button,
+            string label,
+            bool active,
+            bool enabled,
+            ref bool? previousActive)
+        {
+            if (!string.Equals(button.Text, label, StringComparison.Ordinal))
+            {
+                button.Text = label;
+            }
+
+            string description = active
+                ? "Current display refresh mode"
+                : (enabled
+                    ? "Switch display refresh mode"
+                    : "This display mode is not available in the current state");
+            if (!string.Equals(
+                button.AccessibleDescription,
+                description,
+                StringComparison.Ordinal))
+            {
+                button.AccessibleDescription = description;
+            }
+
+            if (!previousActive.HasValue || previousActive.Value != active)
+            {
+                if (active)
+                {
+                    DashboardTheme.StylePrimaryButton(button);
+                }
+                else
+                {
+                    DashboardTheme.StyleSecondaryButton(button);
+                }
+
+                // StyleButtonBase intentionally supplies flexible defaults.
+                // These mode buttons are fixed-width only once on an actual
+                // state change, never again on an unchanged telemetry tick.
+                button.AutoSize = false;
+                button.Size = new Size(170, DashboardTheme.StandardControlHeight);
+                previousActive = active;
+            }
+
+            if (button.Enabled != enabled)
+            {
+                button.Enabled = enabled;
+            }
+        }
+
+        private static string DisplayModeText(DisplayTelemetry display)
+        {
+            if (display.Width <= 0)
+            {
+                return "N/A";
+            }
+
+            return display.Width.ToString(CultureInfo.InvariantCulture)
+                + "\u00d7"
+                + display.Height.ToString(CultureInfo.InvariantCulture)
+                + " @ "
+                + TelemetryText.Refresh(display.RefreshRateHz);
+        }
+
+    }
+}

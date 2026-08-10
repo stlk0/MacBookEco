@@ -1,0 +1,48 @@
+name: Bug report
+description: Something behaved differently from what the documentation describes.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If the problem left a display unusable or the elevated helper doing
+        something it should not, please use
+        [Security Advisories](../../security/advisories/new) instead of a
+        public issue.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >-
+        Paste the Diagnostics page using "Copy public diagnostics". This export
+        omits exact EDID fingerprints and free-form exception details. Do not
+        append raw EDID data, serial numbers, device-instance IDs, registry
+        exports, or other machine-specific identifiers.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: MacBook Eco version
+      placeholder: 0.1.1-alpha
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows build
+      placeholder: 10.0.19045
+    validations:
+      required: true

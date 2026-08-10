@@ -1,0 +1,73 @@
+name: Display profile for another Mac
+description: Propose a tested 48 Hz profile for unsupported hardware.
+labels: ["display-profile"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Submit evidence from the actual machine, not a calculated modeline.
+        Do not attach a raw EDID dump. Redact serial numbers and the
+        instance-specific suffix of device IDs from all supporting evidence.
+
+  - type: input
+    id: model
+    attributes:
+      label: Apple SMBIOS model
+      placeholder: MacBookPro16,1
+    validations:
+      required: true
+
+  - type: input
+    id: panel
+    attributes:
+      label: Panel hardware ID
+      placeholder: APPA044
+    validations:
+      required: true
+
+  - type: input
+    id: native
+    attributes:
+      label: Native timing
+      placeholder: 3072x1920 @ 60 Hz
+    validations:
+      required: true
+
+  - type: textarea
+    id: dtd
+    attributes:
+      label: Native and candidate 48 Hz DTDs
+      description: Provide both as 18 hexadecimal bytes.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU device and driver
+      placeholder: AMD Radeon Pro 5300M, VEN_1002&DEV_7340, 30.0.13045.22003
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: verification
+    attributes:
+      label: Verification on the actual machine
+      options:
+        - label: Native 60 Hz remained available
+          required: true
+        - label: Confirmation timeout restored the previous mode
+          required: true
+        - label: Removal restored the original state after restart
+          required: true
+        - label: The picture was checked after a cold boot
+          required: true
+
+  - type: textarea
+    id: telemetry
+    attributes:
+      label: Before and after telemetry
+      description: Include power source, load, brightness, and sample duration.
+    validations:
+      required: true

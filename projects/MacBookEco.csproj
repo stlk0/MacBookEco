@@ -1,0 +1,135 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>MacBookEco</AssemblyName>
+    <RootNamespace>MacBookEco</RootNamespace>
+    <OutputPath>..\build\out\</OutputPath>
+    <UseWindowsForms>true</UseWindowsForms>
+    <StartupObject>MacBookEco.App.Program</StartupObject>
+    <ApplicationManifest>..\src\App\app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\src\App\MacBookEco.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="mscorlib" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\src\Application\Power\PowerPresetCatalog.cs" />
+    <Compile Include="..\src\Core\AdminHelperExitCodes.cs" />
+    <Compile Include="..\src\Core\DisplayWatchdogExitCodes.cs" />
+    <Compile Include="..\src\Core\FixedTimeComparer.cs" />
+    <Compile Include="..\src\Core\DetailedTiming.cs" />
+    <Compile Include="..\src\Core\DisplayModeKey.cs" />
+    <Compile Include="..\src\Core\DisplayEndpoint.cs" />
+    <Compile Include="..\src\Core\DisplayProfile.cs" />
+    <Compile Include="..\src\Core\EdidBaseBlock.cs" />
+    <Compile Include="..\src\Core\EdidRecoveryPolicy.cs" />
+    <Compile Include="..\src\Core\HardwareSnapshot.cs" />
+    <Compile Include="..\src\Core\HexCodec.cs" />
+    <Compile Include="..\src\Core\EdidJournal.cs" />
+    <Compile Include="..\src\Core\PowerJournal.cs" />
+    <Compile Include="..\src\Core\Journal.cs" />
+    <Compile Include="..\src\Core\JournalCodec.cs" />
+    <Compile Include="..\src\Core\MonitorIdentity.cs" />
+    <Compile Include="..\src\Core\PowerRecoveryPolicy.cs" />
+    <Compile Include="..\src\Core\Sha256Digest.cs" />
+    <Compile Include="..\src\DisplayProfiles\ProfileCatalog.cs" />
+    <Compile Include="..\src\Platform.Windows\DisplayModeNativeMethods.cs" />
+    <Compile Include="..\src\Platform.Windows\DisplayModeService.cs" />
+    <Compile Include="..\src\Platform.Windows\SmbiosReader.cs" />
+    <Compile Include="..\src\Platform.Windows\WindowsHardwareSnapshot.cs" />
+    <Compile Include="..\src\Platform.Windows\DisplayTopologyNativeMethods.cs" />
+    <Compile Include="..\src\Platform.Windows\DisplayTopologyReader.cs" />
+    <Compile Include="..\src\Platform.Windows\InternalPanelSelector.cs" />
+    <Compile Include="..\src\Platform.Windows\MonitorDevnodeReader.cs" />
+    <Compile Include="..\src\Platform.Windows\EdidOverrideRegistry.cs" />
+    <Compile Include="..\src\Platform.Windows\MonitorDevnodeAccess.cs" />
+    <Compile Include="..\src\Platform.Windows\HardwareDiscoveryService.cs" />
+    <Compile Include="..\src\Platform.Windows\InternalDisplayTargetResolver.cs" />
+    <Compile Include="..\src\Platform.Windows\StableDisplayTargetResolver.cs" />
+    <Compile Include="..\src\Platform.Windows\NativeMethods.cs" />
+    <Compile Include="..\src\Platform.Windows\PowerSchemeNative.cs" />
+    <Compile Include="..\src\Platform.Windows\PowerManagedSettings.cs" />
+    <Compile Include="..\src\Platform.Windows\OptimizationStatusReaders.cs" />
+    <Compile Include="..\src\Platform.Windows\PrivilegeGuard.cs" />
+    <Compile Include="..\src\Platform.Windows\SecureStateExceptions.cs" />
+    <Compile Include="..\src\Platform.Windows\SecureStateHandles.cs" />
+    <Compile Include="..\src\Platform.Windows\SecureStateNative.cs" />
+    <Compile Include="..\src\Platform.Windows\SecureStateStore.cs" />
+    <Compile Include="..\src\Platform.Windows\JournalStore.cs" />
+    <Compile Include="..\src\Telemetry\BatteryTelemetryProvider.cs" />
+    <Compile Include="..\src\Telemetry\CpuTelemetryProvider.cs" />
+    <Compile Include="..\src\Telemetry\DisplayTelemetryProvider.cs" />
+    <Compile Include="..\src\Telemetry\OptionalCpuSensorProvider.cs" />
+    <Compile Include="..\src\Telemetry\ProviderInterfaces.cs" />
+    <Compile Include="..\src\Telemetry\TelemetryModels.cs" />
+    <Compile Include="..\src\Telemetry\TelemetryService.cs" />
+    <Compile Include="..\src\Telemetry\WindowsGpuTelemetryProvider.cs" />
+    <Compile Include="..\src\App\ApplicationIcon.cs" />
+    <Compile Include="..\src\App\AssemblyInfo.cs" />
+    <Compile Include="..\src\App\DashboardForm.cs" />
+    <Compile Include="..\src\App\DestructiveConfirmation.cs" />
+    <Compile Include="..\src\App\DashboardDiagnosticsPage.cs" />
+    <Compile Include="..\src\App\DashboardOverviewPage.cs" />
+    <Compile Include="..\src\App\DashboardProfilesController.cs" />
+    <Compile Include="..\src\App\DashboardProfilesPage.cs" />
+    <Compile Include="..\src\App\DashboardTheme.cs" />
+    <Compile Include="..\src\App\CpuPresetPreview.cs" />
+    <Compile Include="..\src\App\DisplayModeConfirmationDialog.cs" />
+    <Compile Include="..\src\App\DisplayRefreshRateUseCase.cs" />
+    <Compile Include="..\src\App\DisplayRefreshRateValidator.cs" />
+    <Compile Include="..\src\App\DisplaySupportUiPolicy.cs" />
+    <Compile Include="..\src\App\DisplayWatchdogClient.cs" />
+    <Compile Include="..\src\App\DisplayWatchdogStartupRecovery.cs" />
+    <Compile Include="..\src\App\ElevatedAdminHelper.cs" />
+    <Compile Include="..\src\App\EmbeddedHelperVerifier.cs" />
+    <Compile Include="..\src\App\GraphDrawingPrimitives.cs" />
+    <Compile Include="..\src\App\GraphSeriesRenderer.cs" />
+    <Compile Include="..\src\App\MetricCard.cs" />
+    <Compile Include="..\src\App\MetricCardPresentation.cs" />
+    <Compile Include="..\src\App\MetricCardRenderer.cs" />
+    <Compile Include="..\src\App\OptimizationActions.cs" />
+    <Compile Include="..\src\App\OptimizationCommandRunner.cs" />
+    <Compile Include="..\src\App\OptimizationProfileCatalog.cs" />
+    <Compile Include="..\src\App\OptimizationStateMonitor.cs" />
+    <Compile Include="..\src\App\Program.cs" />
+    <Compile Include="..\src\App\RingBufferGraph.cs" />
+    <Compile Include="..\src\App\StartupRegistration.cs" />
+    <Compile Include="..\src\App\TimeSeriesAxisRange.cs" />
+    <Compile Include="..\src\App\TimeSeriesBuffer.cs" />
+    <Compile Include="..\src\App\TimeSeriesStatistics.cs" />
+    <Compile Include="..\src\App\TimeSeriesGraphRenderer.cs" />
+    <Compile Include="..\src\App\TrayApplicationContext.cs" />
+    <Compile Include="..\src\App\UninstallSafetyPolicy.cs" />
+    <Compile Include="..\src\App\WindowsOptimizationActionService.cs" />
+    <Compile Include="..\src\Watchdog\DisplayWatchdogProtocol.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\src\App\MacBookEco.ico">
+      <LogicalName>MacBookEco.ico</LogicalName>
+    </EmbeddedResource>
+    <ProjectReference Include="MacBookEco.Admin.csproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType="CompanionExecutable" />
+    <ProjectReference Include="MacBookEco.Watchdog.csproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType="CompanionExecutable" />
+  </ItemGroup>
+
+  <Target Name="EmbedCompanionExecutables" BeforeTargets="BeforeResGen">
+    <Error Condition="'@(CompanionExecutable)' == ''"
+           Text="Admin and Watchdog outputs are required embedded resources." />
+    <ItemGroup>
+      <EmbeddedResource Include="@(CompanionExecutable)"
+                        Type="Non-Resx"
+                        WithCulture="false">
+        <LogicalName>%(Filename)%(Extension)</LogicalName>
+      </EmbeddedResource>
+    </ItemGroup>
+  </Target>
+</Project>

@@ -1,0 +1,58 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MacBookEco", "projects\MacBookEco.csproj", "{0554D3ED-70C1-B0D9-E61E-5EADB2BE7AB6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MacBookEco.Admin", "projects\MacBookEco.Admin.csproj", "{2C74AA25-AB71-8BF7-8CE0-FDD443EB7FB8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MacBookEco.Watchdog", "projects\MacBookEco.Watchdog.csproj", "{A00B306B-255A-2BF7-B529-B4FFEC30F2C1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MacBookEco.PackagingTests", "projects\MacBookEco.PackagingTests.csproj", "{0153600E-DB24-A363-89F3-ED8E5AB0EBD7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MacBookEco.WatchdogTests", "projects\MacBookEco.WatchdogTests.csproj", "{8350954D-2B87-99B8-948C-9BB570CBA3BE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MacBookEco.AppTests", "projects\MacBookEco.AppTests.csproj", "{3AE34945-C667-D89D-510D-A98E3FB291EC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MacBookEco.PlatformSecurityTests", "projects\MacBookEco.PlatformSecurityTests.csproj", "{041B08F5-E0FC-E721-6115-27CCDEECDAC3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MacBookEco.PlatformDiagnostics", "projects\MacBookEco.PlatformDiagnostics.csproj", "{11070BA9-40FA-954A-E02B-ECDAA9956BD9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0554D3ED-70C1-B0D9-E61E-5EADB2BE7AB6}.Debug|x64.ActiveCfg = Debug|x64
+		{0554D3ED-70C1-B0D9-E61E-5EADB2BE7AB6}.Debug|x64.Build.0 = Debug|x64
+		{0554D3ED-70C1-B0D9-E61E-5EADB2BE7AB6}.Release|x64.ActiveCfg = Release|x64
+		{0554D3ED-70C1-B0D9-E61E-5EADB2BE7AB6}.Release|x64.Build.0 = Release|x64
+		{2C74AA25-AB71-8BF7-8CE0-FDD443EB7FB8}.Debug|x64.ActiveCfg = Debug|x64
+		{2C74AA25-AB71-8BF7-8CE0-FDD443EB7FB8}.Debug|x64.Build.0 = Debug|x64
+		{2C74AA25-AB71-8BF7-8CE0-FDD443EB7FB8}.Release|x64.ActiveCfg = Release|x64
+		{2C74AA25-AB71-8BF7-8CE0-FDD443EB7FB8}.Release|x64.Build.0 = Release|x64
+		{A00B306B-255A-2BF7-B529-B4FFEC30F2C1}.Debug|x64.ActiveCfg = Debug|x64
+		{A00B306B-255A-2BF7-B529-B4FFEC30F2C1}.Debug|x64.Build.0 = Debug|x64
+		{A00B306B-255A-2BF7-B529-B4FFEC30F2C1}.Release|x64.ActiveCfg = Release|x64
+		{A00B306B-255A-2BF7-B529-B4FFEC30F2C1}.Release|x64.Build.0 = Release|x64
+		{0153600E-DB24-A363-89F3-ED8E5AB0EBD7}.Debug|x64.ActiveCfg = Debug|x64
+		{0153600E-DB24-A363-89F3-ED8E5AB0EBD7}.Debug|x64.Build.0 = Debug|x64
+		{0153600E-DB24-A363-89F3-ED8E5AB0EBD7}.Release|x64.ActiveCfg = Release|x64
+		{0153600E-DB24-A363-89F3-ED8E5AB0EBD7}.Release|x64.Build.0 = Release|x64
+		{8350954D-2B87-99B8-948C-9BB570CBA3BE}.Debug|x64.ActiveCfg = Debug|x64
+		{8350954D-2B87-99B8-948C-9BB570CBA3BE}.Debug|x64.Build.0 = Debug|x64
+		{8350954D-2B87-99B8-948C-9BB570CBA3BE}.Release|x64.ActiveCfg = Release|x64
+		{8350954D-2B87-99B8-948C-9BB570CBA3BE}.Release|x64.Build.0 = Release|x64
+		{3AE34945-C667-D89D-510D-A98E3FB291EC}.Debug|x64.ActiveCfg = Debug|x64
+		{3AE34945-C667-D89D-510D-A98E3FB291EC}.Debug|x64.Build.0 = Debug|x64
+		{3AE34945-C667-D89D-510D-A98E3FB291EC}.Release|x64.ActiveCfg = Release|x64
+		{3AE34945-C667-D89D-510D-A98E3FB291EC}.Release|x64.Build.0 = Release|x64
+		{041B08F5-E0FC-E721-6115-27CCDEECDAC3}.Debug|x64.ActiveCfg = Debug|x64
+		{041B08F5-E0FC-E721-6115-27CCDEECDAC3}.Debug|x64.Build.0 = Debug|x64
+		{041B08F5-E0FC-E721-6115-27CCDEECDAC3}.Release|x64.ActiveCfg = Release|x64
+		{041B08F5-E0FC-E721-6115-27CCDEECDAC3}.Release|x64.Build.0 = Release|x64
+		{11070BA9-40FA-954A-E02B-ECDAA9956BD9}.Debug|x64.ActiveCfg = Debug|x64
+		{11070BA9-40FA-954A-E02B-ECDAA9956BD9}.Debug|x64.Build.0 = Debug|x64
+		{11070BA9-40FA-954A-E02B-ECDAA9956BD9}.Release|x64.ActiveCfg = Release|x64
+		{11070BA9-40FA-954A-E02B-ECDAA9956BD9}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+EndGlobal

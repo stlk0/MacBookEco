@@ -1,0 +1,82 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+
+namespace MacBookEco.Core
+{
+    public static class ProfileCatalog
+    {
+        public const string MacBookPro161Appa044ProfileId =
+            "macbookpro16-1-appa044-48hz";
+
+        private static readonly ReadOnlyCollection<DisplayProfile> Profiles =
+            Array.AsReadOnly(
+                new[]
+                {
+                    new DisplayProfile(
+                        MacBookPro161Appa044ProfileId,
+                        "MacBook Pro 16-inch 2019 / APPA044",
+                        new[] { "MacBookPro16,1" },
+                        "APPA044",
+                        "CDA0E18080DE8CAC744C66A5374A53CBBA1999115FA5FE2DBD949980649AF3F5",
+                        DetailedTiming.ParseHex(
+                            "E7 91 00 50 C0 80 37 70 08 20 98 08 59 D7 10 00 00 1A"),
+                        DetailedTiming.ParseHex(
+                            "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A"),
+                        "AMD Radeon Pro 5300M",
+                        "PCI\\VEN_1002&DEV_7340",
+                        "30.0.13045.22003")
+                });
+
+        public static ReadOnlyCollection<DisplayProfile> All => Profiles;
+
+        public static DisplayProfile GetById(string profileId)
+        {
+            if (string.IsNullOrWhiteSpace(profileId))
+            {
+                return null;
+            }
+
+            for (var index = 0; index < Profiles.Count; index++)
+            {
+                if (
+                    string.Equals(
+                        Profiles[index].Id,
+                        profileId,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return Profiles[index];
+                }
+            }
+
+            return null;
+        }
+
+        public static ProfileSelectionResult Select(HardwareSnapshot hardware)
+        {
+            if (hardware == null)
+            {
+                throw new ArgumentNullException(nameof(hardware));
+            }
+
+            DisplayProfileMatch closest = null;
+            for (var index = 0; index < Profiles.Count; index++)
+            {
+                var match = Profiles[index].Match(hardware);
+                if (match.HardwareSupported)
+                {
+                    return new ProfileSelectionResult(Profiles[index], match);
+                }
+
+                if (
+                    closest == null ||
+                    match.RejectionReasons.Count < closest.RejectionReasons.Count)
+                {
+                    closest = match;
+                }
+            }
+
+            return new ProfileSelectionResult(null, closest);
+        }
+    }
+}

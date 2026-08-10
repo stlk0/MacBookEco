@@ -1,0 +1,9 @@
+# This is a Windows-only project built by PowerShell and csc/MSBuild.
+# Normalize in the repository, check out CRLF so every tool sees the same text.
+* text=auto eol=crlf
+
+*.png binary
+*.bin binary
+*.exe binary
+*.pdb binary
+*.zip binary

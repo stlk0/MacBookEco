@@ -1,0 +1,6 @@
+# Release and signing controls are security-sensitive.
+/.github/workflows/ @stlk0
+/.signpath/ @stlk0
+/build/ @stlk0
+/docs/CODE_SIGNING.md @stlk0
+/SECURITY.md @stlk0

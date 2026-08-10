@@ -1,0 +1,12 @@
+version: 2
+
+# The application itself has no runtime package dependencies to update. The
+# development-only .NET SDK is selected by global.json and updated through a
+# reviewed build change. Dependabot keeps the workflow actions current.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: build

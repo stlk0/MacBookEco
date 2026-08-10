@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>MacBookEco.AppTests</AssemblyName>
+    <RootNamespace>MacBookEco</RootNamespace>
+    <OutputPath>..\build\out\</OutputPath>
+    <UseWindowsForms>true</UseWindowsForms>
+    <StartupObject>MacBookEco.Tests.App.Program</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="mscorlib" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\tests\Shared\TestSupport.cs" />
+    <Compile Include="..\tests\App\Program.cs" />
+    <Compile Include="..\tests\Core\TestRunner.cs" />
+    <Compile Include="..\tests\Security\Program.cs" />
+    <Compile Include="..\tests\Smoke\Program.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="MacBookEco.csproj">
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>MacBookEco.Admin</AssemblyName>
+    <RootNamespace>MacBookEco</RootNamespace>
+    <OutputPath>..\build\out\</OutputPath>
+    <StartupObject>MacBookEco.Admin.Program</StartupObject>
+    <ApplicationManifest>..\src\Admin\app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="mscorlib" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\src\Application\Power\PowerPresetCatalog.cs" />
+    <Compile Include="..\src\Core\AdminHelperExitCodes.cs" />
+    <Compile Include="..\src\Core\FixedTimeComparer.cs" />
+    <Compile Include="..\src\Core\DetailedTiming.cs" />
+    <Compile Include="..\src\Core\DisplayModeKey.cs" />
+    <Compile Include="..\src\Core\DisplayEndpoint.cs" />
+    <Compile Include="..\src\Core\DisplayProfile.cs" />
+    <Compile Include="..\src\Core\EdidBaseBlock.cs" />
+    <Compile Include="..\src\Core\EdidRecoveryPolicy.cs" />
+    <Compile Include="..\src\Core\HardwareSnapshot.cs" />
+    <Compile Include="..\src\Core\HexCodec.cs" />
+    <Compile Include="..\src\Core\EdidJournal.cs" />
+    <Compile Include="..\src\Core\PowerJournal.cs" />
+    <Compile Include="..\src\Core\Journal.cs" />
+    <Compile Include="..\src\Core\JournalCodec.cs" />
+    <Compile Include="..\src\Core\MonitorIdentity.cs" />
+    <Compile Include="..\src\Core\PowerRecoveryPolicy.cs" />
+    <Compile Include="..\src\Core\Sha256Digest.cs" />
+    <Compile Include="..\src\DisplayProfiles\ProfileCatalog.cs" />
+    <Compile Include="..\src\Platform.Windows\DisplayModeNativeMethods.cs" />
+    <Compile Include="..\src\Platform.Windows\DisplayModeService.cs" />
+    <Compile Include="..\src\Platform.Windows\EdidOverrideService.cs" />
+    <Compile Include="..\src\Platform.Windows\SmbiosReader.cs" />
+    <Compile Include="..\src\Platform.Windows\WindowsHardwareSnapshot.cs" />
+    <Compile Include="..\src\Platform.Windows\DisplayTopologyNativeMethods.cs" />
+    <Compile Include="..\src\Platform.Windows\DisplayTopologyReader.cs" />
+    <Compile Include="..\src\Platform.Windows\InternalPanelSelector.cs" />
+    <Compile Include="..\src\Platform.Windows\MonitorDevnodeReader.cs" />
+    <Compile Include="..\src\Platform.Windows\EdidOverrideRegistry.cs" />
+    <Compile Include="..\src\Platform.Windows\MonitorDevnodeAccess.cs" />
+    <Compile Include="..\src\Platform.Windows\HardwareDiscoveryService.cs" />
+    <Compile Include="..\src\Platform.Windows\InternalDisplayTargetResolver.cs" />
+    <Compile Include="..\src\Platform.Windows\NativeMethods.cs" />
+    <Compile Include="..\src\Platform.Windows\PowerSchemeNative.cs" />
+    <Compile Include="..\src\Platform.Windows\PowerManagedSettings.cs" />
+    <Compile Include="..\src\Platform.Windows\OptimizationStatusReaders.cs" />
+    <Compile Include="..\src\Platform.Windows\PowerSchemeOperationResult.cs" />
+    <Compile Include="..\src\Platform.Windows\PowerSchemeSettings.cs" />
+    <Compile Include="..\src\Platform.Windows\PowerSchemeService.cs" />
+    <Compile Include="..\src\Platform.Windows\PrivilegeGuard.cs" />
+    <Compile Include="..\src\Platform.Windows\SecureStateExceptions.cs" />
+    <Compile Include="..\src\Platform.Windows\SecureStateHandles.cs" />
+    <Compile Include="..\src\Platform.Windows\SecureStateNative.cs" />
+    <Compile Include="..\src\Platform.Windows\SecureStateStore.cs" />
+    <Compile Include="..\src\Platform.Windows\JournalStore.cs" />
+    <Compile Include="..\src\Admin\AssemblyInfo.cs" />
+    <Compile Include="..\src\Admin\Program.cs" />
+  </ItemGroup>
+</Project>

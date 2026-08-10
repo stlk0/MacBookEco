@@ -1,0 +1,44 @@
+# Build output
+artifacts/
+build/out/
+build/release/
+build/obj/
+bin/
+obj/
+packages/
+
+# Local maintainer tool caches are never redistributed.
+build/tools/
+
+# Local hardware-acceptance evidence.
+# These runs capture the device instance ID, raw EDID dumps and screenshots of
+# the machine they were produced on. CONTRIBUTING.md forbids committing that,
+# so the evidence stays local and is attached to a report by hand instead.
+build/acceptance/
+build/ui-verify/
+build/*.png
+
+# IDE and tooling
+.vs/
+*.user
+*.suo
+.claude/settings.local.json
+
+# Local maintainer context for Codex. This may contain private roadmap notes
+# and preferences that are not part of the public project documentation.
+/AGENTS.md
+
+# Transient
+*.log
+*.tmp
+*.bak
+
+# Signing material must never be committed.
+*.pfx
+*.p12
+*.pem
+*.pvk
+*.key
+*.snk
+.env
+.env.*

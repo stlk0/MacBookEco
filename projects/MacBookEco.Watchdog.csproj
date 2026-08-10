@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>MacBookEco.Watchdog</AssemblyName>
+    <RootNamespace>MacBookEco</RootNamespace>
+    <OutputPath>..\build\out\</OutputPath>
+    <StartupObject>MacBookEco.Watchdog.Program</StartupObject>
+    <ApplicationManifest>..\src\Watchdog\app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="mscorlib" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\src\Core\DisplayWatchdogExitCodes.cs" />
+    <Compile Include="..\src\Watchdog\AssemblyInfo.cs" />
+    <Compile Include="..\src\Watchdog\DisplayWatchdogProtocol.cs" />
+    <Compile Include="..\src\Watchdog\Program.cs" />
+    <Compile Include="..\src\Core\DetailedTiming.cs" />
+    <Compile Include="..\src\Core\DisplayModeKey.cs" />
+    <Compile Include="..\src\Core\DisplayEndpoint.cs" />
+    <Compile Include="..\src\Core\EdidBaseBlock.cs" />
+    <Compile Include="..\src\Core\FixedTimeComparer.cs" />
+    <Compile Include="..\src\Core\HardwareSnapshot.cs" />
+    <Compile Include="..\src\Core\HexCodec.cs" />
+    <Compile Include="..\src\Core\MonitorIdentity.cs" />
+    <Compile Include="..\src\Core\Sha256Digest.cs" />
+    <Compile Include="..\src\Platform.Windows\DisplayModeNativeMethods.cs" />
+    <Compile Include="..\src\Platform.Windows\DisplayModeService.cs" />
+    <Compile Include="..\src\Platform.Windows\DisplayTopologyNativeMethods.cs" />
+    <Compile Include="..\src\Platform.Windows\DisplayTopologyReader.cs" />
+    <Compile Include="..\src\Platform.Windows\InternalPanelSelector.cs" />
+    <Compile Include="..\src\Platform.Windows\MonitorDevnodeReader.cs" />
+    <Compile Include="..\src\Platform.Windows\StableDisplayTargetResolver.cs" />
+  </ItemGroup>
+</Project>
