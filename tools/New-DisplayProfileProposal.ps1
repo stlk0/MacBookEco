@@ -42,29 +42,32 @@ function Read-DetailedTiming {
         [int]$Offset
     )
 
-    $pixelClock = $Bytes[$Offset] -bor ($Bytes[$Offset + 1] -shl 8)
+    $pixelClock = [int]$Bytes[$Offset] -bor `
+        ([int]$Bytes[$Offset + 1] -shl 8)
     if ($pixelClock -eq 0) {
         throw 'The preferred descriptor is not a detailed timing.'
     }
 
     return [pscustomobject]@{
         PixelClock10Khz = $pixelClock
-        HorizontalActive = $Bytes[$Offset + 2] -bor `
-            (($Bytes[$Offset + 4] -band 0xF0) -shl 4)
-        HorizontalBlanking = $Bytes[$Offset + 3] -bor `
-            (($Bytes[$Offset + 4] -band 0x0F) -shl 8)
-        VerticalActive = $Bytes[$Offset + 5] -bor `
-            (($Bytes[$Offset + 7] -band 0xF0) -shl 4)
-        VerticalBlanking = $Bytes[$Offset + 6] -bor `
-            (($Bytes[$Offset + 7] -band 0x0F) -shl 8)
-        HorizontalSyncOffset = $Bytes[$Offset + 8] -bor `
-            (($Bytes[$Offset + 11] -band 0xC0) -shl 2)
-        HorizontalSyncWidth = $Bytes[$Offset + 9] -bor `
-            (($Bytes[$Offset + 11] -band 0x30) -shl 4)
-        VerticalSyncOffset = (($Bytes[$Offset + 10] -band 0xF0) -shr 4) -bor `
-            (($Bytes[$Offset + 11] -band 0x0C) -shl 2)
-        VerticalSyncWidth = ($Bytes[$Offset + 10] -band 0x0F) -bor `
-            (($Bytes[$Offset + 11] -band 0x03) -shl 4)
+        HorizontalActive = [int]$Bytes[$Offset + 2] -bor `
+            (([int]$Bytes[$Offset + 4] -band 0xF0) -shl 4)
+        HorizontalBlanking = [int]$Bytes[$Offset + 3] -bor `
+            (([int]$Bytes[$Offset + 4] -band 0x0F) -shl 8)
+        VerticalActive = [int]$Bytes[$Offset + 5] -bor `
+            (([int]$Bytes[$Offset + 7] -band 0xF0) -shl 4)
+        VerticalBlanking = [int]$Bytes[$Offset + 6] -bor `
+            (([int]$Bytes[$Offset + 7] -band 0x0F) -shl 8)
+        HorizontalSyncOffset = [int]$Bytes[$Offset + 8] -bor `
+            (([int]$Bytes[$Offset + 11] -band 0xC0) -shl 2)
+        HorizontalSyncWidth = [int]$Bytes[$Offset + 9] -bor `
+            (([int]$Bytes[$Offset + 11] -band 0x30) -shl 4)
+        VerticalSyncOffset = `
+            (([int]$Bytes[$Offset + 10] -band 0xF0) -shr 4) -bor `
+            (([int]$Bytes[$Offset + 11] -band 0x0C) -shl 2)
+        VerticalSyncWidth = `
+            ([int]$Bytes[$Offset + 10] -band 0x0F) -bor `
+            (([int]$Bytes[$Offset + 11] -band 0x03) -shl 4)
         Flags = $Bytes[$Offset + 17]
     }
 }
@@ -123,7 +126,7 @@ function Format-Sha256 {
 function Decode-Manufacturer {
     param([byte[]]$Bytes)
 
-    $encoded = ($Bytes[8] -shl 8) -bor $Bytes[9]
+    $encoded = ([int]$Bytes[8] -shl 8) -bor ([int]$Bytes[9])
     $values = @(
         (($encoded -shr 10) -band 0x1F),
         (($encoded -shr 5) -band 0x1F),
@@ -253,7 +256,7 @@ for ($index = $firstDescriptorOffset + $descriptorLength;
 $normalized[127] = 0
 
 $manufacturer = Decode-Manufacturer $edid
-$productCode = $edid[10] -bor ($edid[11] -shl 8)
+$productCode = [int]$edid[10] -bor ([int]$edid[11] -shl 8)
 $panelHardwareId = $manufacturer + $productCode.ToString('X4')
 $SystemModel = $SystemModel.Trim()
 $GpuDeviceIdPrefix = $GpuDeviceIdPrefix.Trim().ToUpperInvariant()
