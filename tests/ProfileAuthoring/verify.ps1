@@ -5,8 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$proposalTool = Join-Path $repoRoot 'tools\New-DisplayProfileProposal.ps1'
-$catalogTool = Join-Path $repoRoot 'tools\Generate-ProfileCatalog.ps1'
+$authoringTool = Join-Path $repoRoot 'tools\ProfileAuthoring.ps1'
 $temporaryRoot = Join-Path `
     ([IO.Path]::GetTempPath()) `
     ('MacBookEco-profile-authoring-' + [Guid]::NewGuid().ToString('N'))
@@ -59,7 +58,8 @@ function New-SyntheticEdid {
 function Invoke-Proposal {
     param([string]$Path)
 
-    $json = & $proposalTool `
+    $json = & $authoringTool `
+        -Propose `
         -EdidPath $Path `
         -SystemModel 'MacBookPro16,1' `
         -GpuDeviceIdPrefix 'PCI\VEN_1002&DEV_7340' `
@@ -100,7 +100,7 @@ try {
         throw 'The proposal tool accepted a checksum-corrupt EDID.'
     }
 
-    & $catalogTool -Check
+    & $authoringTool -Check
 
     Write-Host 'Profile authoring behavior passed (3/3).'
 }

@@ -2,7 +2,7 @@
 
 The JSON files in this directory are the reviewed source for the built-in
 display catalog. The application does not read JSON, accept profile paths, or
-generate timings at runtime. `tools/Generate-ProfileCatalog.ps1` validates the
+generate timings at runtime. `tools/ProfileAuthoring.ps1` validates the
 manifests and produces the committed
 `src/DisplayProfiles/ProfileCatalog.Generated.cs` file used by both the app and
 the elevated helper.
@@ -12,7 +12,7 @@ the elevated helper.
 Run the offline authoring utility on Windows with a complete binary EDID file:
 
 ```powershell
-.\tools\New-DisplayProfileProposal.ps1 `
+.\tools\ProfileAuthoring.ps1 -Propose `
     -EdidPath .\private\display.edid `
     -SystemModel MacBookPro16,1 `
     -GpuDeviceIdPrefix 'PCI\VEN_1002&DEV_7340' `
@@ -38,7 +38,7 @@ After a profile is accepted, copy the reviewed proposal to this directory and
 run:
 
 ```powershell
-.\tools\Generate-ProfileCatalog.ps1
+.\tools\ProfileAuthoring.ps1 -Generate
 ```
 
 Commit the manifest and generated C# file together. The normal Windows build

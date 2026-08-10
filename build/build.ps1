@@ -13,7 +13,7 @@ $versionPath = Join-Path $repoRoot "VERSION"
 $globalJsonPath = Join-Path $repoRoot "global.json"
 $profileCatalogCheck = Join-Path `
     $repoRoot `
-    "tools\Generate-ProfileCatalog.ps1"
+    "tools\ProfileAuthoring.ps1"
 
 if ($env:OS -ne "Windows_NT") {
     throw "MacBook Eco builds require Windows and .NET Framework 4.8."
