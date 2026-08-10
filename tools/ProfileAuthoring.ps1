@@ -285,7 +285,7 @@ $($blocks -join ",`r`n")
 }
 
 function Invoke-Catalog {
-    $profiles = Read-Profiles
+    $profiles = @(Read-Profiles)
     $expected = New-CatalogSource $profiles
     if ($Check) {
         $actual = if (Test-Path $script:catalogPath -PathType Leaf) {
