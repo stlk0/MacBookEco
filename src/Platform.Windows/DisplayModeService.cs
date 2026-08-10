@@ -360,7 +360,7 @@ namespace MacBookEco.Platform.Windows
             if (refreshRate != 48 && refreshRate != 60)
                 throw new ArgumentOutOfRangeException(
                     nameof(refreshRate),
-                    "Only the app-owned 48 Hz and native 60 Hz transitions are permitted.");
+                    "Only the reviewed 48 Hz and native 60 Hz transitions are permitted.");
         }
 
         private static void ValidateConfirmationTimeout(TimeSpan confirmationTimeout)

@@ -13,13 +13,6 @@ namespace MacBookEco.Tests.App
 {
     internal static class Program
     {
-        private const string ExperimentalProfileId =
-            "exp48-v1-mbp161-7340-" +
-            "0d248c3f0d1f6bea6b207f50f9e7cd669e518ac7dfe22c9184ad04801080b8da";
-        private const string AlternateExperimentalProfileId =
-            "exp48-v1-mbp161-7340-" +
-            "1d248c3f0d1f6bea6b207f50f9e7cd669e518ac7dfe22c9184ad04801080b8da";
-
         private static int Main()
         {
             List<TestCase> tests = new List<TestCase>
@@ -44,10 +37,6 @@ namespace MacBookEco.Tests.App
                     TestMetricCardPresentationMapsStatusAndAccessibility),
                 Test("Display confirmation countdown honors its deadline",
                     TestDisplayConfirmationCountdownBoundary),
-                Test("Experimental refresh binds the journal to the active panel",
-                    TestExperimentalRefreshRequiresJournalTarget),
-                Test("Install command preserves experimental risk acknowledgement",
-                    TestInstallCommandPreservesRiskAcknowledgement),
                 Test("Display support UI exposes only safe actions",
                     TestDisplaySupportUiPolicy),
                 Test("Startup command selects background mode",
@@ -68,10 +57,6 @@ namespace MacBookEco.Tests.App
                     TestActionServiceStopsAfterHelperFailure),
                 Test("Action service verifies display-support read-back",
                     TestActionServiceVerifiesDisplaySupportReadBack),
-                Test("Action service enforces experimental install acknowledgement",
-                    TestActionServiceEnforcesExperimentalAcknowledgement),
-                Test("Action state exposes reviewed IDs but hides generated IDs",
-                    TestActionStateProjectsSafeProfileIdentity),
                 Test("Action service maps and verifies every CPU preset",
                     TestActionServiceMapsAndVerifiesCpuPresets),
                 Test("Unsupported CPU hardware never reaches the helper",
@@ -387,11 +372,7 @@ namespace MacBookEco.Tests.App
                 Check.Equal(OperationCode.HelperIndeterminate, result.Code);
                 Check.Equal(1, harness.AdminCommands.Count);
                 Check.Equal(expectedCommands[index], harness.AdminCommands[0]);
-                Check.That(
-                    harness.AdminAcknowledgementTokens[0] == null,
-                    "A nonexperimental helper command carried a token.");
-                Check.Equal(index == 0 ? 1 : 0, harness.DisplayStatusReads);
-                Check.Equal(index == 0 ? 1 : 0, harness.DisplayCandidateReads);
+                Check.Equal(0, harness.DisplayStatusReads);
                 Check.Equal(0, harness.PowerStatusReads);
             }
         }
@@ -410,7 +391,7 @@ namespace MacBookEco.Tests.App
 
             Check.Equal(OperationOutcome.Succeeded, installed.Outcome);
             Check.True(installed.RestartRequired);
-            Check.Equal(2, harness.DisplayStatusReads);
+            Check.Equal(1, harness.DisplayStatusReads);
 
             OptimizationStateSnapshot pendingRestart =
                 harness.Service.ReadState();
@@ -443,298 +424,6 @@ namespace MacBookEco.Tests.App
                 harness.Service.InstallDisplaySupport();
             Check.Equal(OperationOutcome.Failed, faulted.Outcome);
             Check.Equal(OperationCode.UnhandledException, faulted.Code);
-        }
-
-        private static void TestActionServiceEnforcesExperimentalAcknowledgement()
-        {
-            ActionServiceHarness declined = new ActionServiceHarness();
-            declined.DisplayStatus = new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.NotInstalled
-            };
-            declined.DisplayCandidate = CandidateStatus(true);
-
-            OptimizationActionResult cancelled =
-                declined.Service.InstallDisplaySupport();
-
-            Check.Equal(OperationOutcome.Cancelled, cancelled.Outcome);
-            Check.Equal(OperationCode.UserCancelled, cancelled.Code);
-            Check.Equal(0, declined.AdminCommands.Count);
-            Check.Equal(1, declined.DisplayCandidateReads);
-
-            ActionServiceHarness accepted = new ActionServiceHarness();
-            accepted.DisplayCandidate = CandidateStatus(true);
-            accepted.DisplayStatuses.Enqueue(new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.NotInstalled
-            });
-            accepted.DisplayStatuses.Enqueue(new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.Installed,
-                ProfileId = ExperimentalProfileId,
-                ExperimentalProfile = true
-            });
-
-            OptimizationActionResult installed =
-                accepted.Service.InstallDisplaySupport(
-                    Experimental48HzProfileGenerator
-                        .CreateAcknowledgementToken(ExperimentalProfileId));
-
-            Check.Equal(OperationOutcome.Succeeded, installed.Outcome);
-            Check.Equal(1, accepted.AdminCommands.Count);
-            Check.Equal(
-                AdminCommand.InstallExperimentalDisplay,
-                accepted.AdminCommands[0]);
-            Check.Equal(
-                Experimental48HzProfileGenerator.CreateAcknowledgementToken(
-                    ExperimentalProfileId),
-                accepted.AdminAcknowledgementTokens[0]);
-            Check.Equal(1, accepted.DisplayCandidateReads);
-
-            ActionServiceHarness changedReadBack = new ActionServiceHarness();
-            changedReadBack.DisplayCandidate = CandidateStatus(true);
-            changedReadBack.DisplayStatuses.Enqueue(new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.NotInstalled
-            });
-            changedReadBack.DisplayStatuses.Enqueue(new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.Installed,
-                ProfileId = AlternateExperimentalProfileId,
-                ExperimentalProfile = true
-            });
-            OptimizationActionResult changedReadBackResult =
-                changedReadBack.Service.InstallDisplaySupport(
-                    Experimental48HzProfileGenerator
-                        .CreateAcknowledgementToken(ExperimentalProfileId));
-            Check.Equal(OperationOutcome.Failed, changedReadBackResult.Outcome);
-            Check.Equal(
-                OperationCode.StateVerificationFailed,
-                changedReadBackResult.Code);
-            Check.Equal(1, changedReadBack.AdminCommands.Count);
-
-            ActionServiceHarness changedCandidate = new ActionServiceHarness();
-            changedCandidate.DisplayStatus = new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.NotInstalled
-            };
-            changedCandidate.DisplayCandidate = CandidateStatus(true);
-            changedCandidate.DisplayCandidate.ExperimentalAcknowledgementToken =
-                Experimental48HzProfileGenerator.CreateAcknowledgementToken(
-                    AlternateExperimentalProfileId);
-            OptimizationActionResult changedResult =
-                changedCandidate.Service.InstallDisplaySupport(
-                    Experimental48HzProfileGenerator
-                        .CreateAcknowledgementToken(ExperimentalProfileId));
-            Check.Equal(OperationOutcome.Cancelled, changedResult.Outcome);
-            Check.Equal(0, changedCandidate.AdminCommands.Count);
-
-            ActionServiceHarness changedToReviewed = new ActionServiceHarness();
-            changedToReviewed.DisplayStatus = new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.NotInstalled
-            };
-            changedToReviewed.DisplayCandidate = CandidateStatus(false);
-            OptimizationActionResult changedToReviewedResult =
-                changedToReviewed.Service.InstallDisplaySupport(
-                    Experimental48HzProfileGenerator
-                        .CreateAcknowledgementToken(ExperimentalProfileId));
-            Check.Equal(
-                OperationOutcome.Cancelled,
-                changedToReviewedResult.Outcome);
-            Check.Equal(0, changedToReviewed.AdminCommands.Count);
-
-            ActionServiceHarness changedToOwned = new ActionServiceHarness();
-            changedToOwned.DisplayStatus = new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.Conflict,
-                ProfileId = AlternateExperimentalProfileId,
-                ExperimentalProfile = true
-            };
-            OptimizationActionResult changedToOwnedResult =
-                changedToOwned.Service.InstallDisplaySupport(
-                    Experimental48HzProfileGenerator
-                        .CreateAcknowledgementToken(ExperimentalProfileId));
-            Check.Equal(
-                OperationOutcome.Cancelled,
-                changedToOwnedResult.Outcome);
-            Check.Equal(0, changedToOwned.AdminCommands.Count);
-
-            ActionServiceHarness reviewed = new ActionServiceHarness();
-            reviewed.DisplayCandidate = CandidateStatus(false);
-            reviewed.DisplayStatuses.Enqueue(new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.NotInstalled
-            });
-            reviewed.DisplayStatuses.Enqueue(new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.Installed,
-                ProfileId = "reviewed-static-profile"
-            });
-
-            OptimizationActionResult reviewedInstall =
-                reviewed.Service.InstallDisplaySupport();
-
-            Check.Equal(OperationOutcome.Succeeded, reviewedInstall.Outcome);
-            Check.Equal(1, reviewed.AdminCommands.Count);
-            Check.Equal(AdminCommand.InstallDisplay, reviewed.AdminCommands[0]);
-
-            ActionServiceHarness repair = new ActionServiceHarness();
-            repair.DisplayCandidate = CandidateStatus(true);
-            repair.DisplayStatuses.Enqueue(new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.Conflict,
-                ProfileId = ExperimentalProfileId,
-                ExperimentalProfile = true
-            });
-            repair.DisplayStatuses.Enqueue(new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.Installed,
-                ProfileId = ExperimentalProfileId,
-                ExperimentalProfile = true
-            });
-
-            OptimizationActionResult repaired =
-                repair.Service.InstallDisplaySupport();
-
-            Check.Equal(OperationOutcome.Succeeded, repaired.Outcome);
-            Check.Equal(1, repair.AdminCommands.Count);
-            Check.Equal(
-                AdminCommand.InstallExperimentalDisplay,
-                repair.AdminCommands[0]);
-            Check.Equal(
-                Experimental48HzProfileGenerator.CreateAcknowledgementToken(
-                    ExperimentalProfileId),
-                repair.AdminAcknowledgementTokens[0]);
-            Check.Equal(0, repair.DisplayCandidateReads);
-        }
-
-        private static DisplayProfileCandidateStatus CandidateStatus(
-            bool experimental)
-        {
-            return new DisplayProfileCandidateStatus
-            {
-                Available = true,
-                EligibleForInstall = true,
-                Experimental = experimental,
-                ReviewedProfileId = experimental
-                    ? string.Empty
-                    : ProfileCatalog.MacBookPro161Appa044ProfileId,
-                ExperimentalAcknowledgementToken = experimental
-                    ? Experimental48HzProfileGenerator
-                        .CreateAcknowledgementToken(ExperimentalProfileId)
-                    : null,
-                SafeSummary = experimental
-                    ? "Experimental candidate summary."
-                    : "Reviewed candidate summary."
-            };
-        }
-
-        private static void TestActionStateProjectsSafeProfileIdentity()
-        {
-            ActionServiceHarness reviewed = new ActionServiceHarness();
-            reviewed.DisplayStatus = new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.NotInstalled
-            };
-            reviewed.DisplayCandidate = CandidateStatus(false);
-
-            OptimizationStateSnapshot reviewedState =
-                reviewed.Service.ReadState();
-            Check.Equal(
-                ProfileCatalog.MacBookPro161Appa044ProfileId,
-                reviewedState.DisplayProfileId);
-            Check.False(reviewedState.DisplayProfileExperimental);
-
-            ActionServiceHarness experimental = new ActionServiceHarness();
-            experimental.DisplayStatus = new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.NotInstalled
-            };
-            experimental.DisplayCandidate = CandidateStatus(true);
-
-            OptimizationStateSnapshot experimentalState =
-                experimental.Service.ReadState();
-            Check.True(experimentalState.DisplayProfileExperimental);
-            Check.Equal(string.Empty, experimentalState.DisplayProfileId);
-            Check.Equal(
-                experimental.DisplayCandidate
-                    .ExperimentalAcknowledgementToken,
-                experimentalState.DisplayCandidateAcknowledgementToken);
-            string freshDiagnostics =
-                DashboardDiagnosticsPage.BuildPublicDiagnostics(
-                    TelemetrySnapshot.Empty(),
-                    experimentalState,
-                    null);
-            Check.That(
-                freshDiagnostics.IndexOf(
-                    experimentalState.DisplayCandidateAcknowledgementToken,
-                    StringComparison.Ordinal) < 0,
-                "Public diagnostics exposed a fresh consent token.");
-
-            ActionServiceHarness installedExperimental =
-                new ActionServiceHarness();
-            installedExperimental.DisplayStatus = new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.Installed,
-                ProfileId = ExperimentalProfileId,
-                ExperimentalProfile = true
-            };
-            installedExperimental.DisplayCandidate = CandidateStatus(true);
-            OptimizationStateSnapshot installedExperimentalState =
-                installedExperimental.Service.ReadState();
-            Check.Equal(
-                "Experimental local 48 Hz candidate",
-                installedExperimentalState.DisplayProfileId);
-            string diagnostics =
-                DashboardDiagnosticsPage.BuildPublicDiagnostics(
-                    TelemetrySnapshot.Empty(),
-                    installedExperimentalState,
-                    null);
-            Check.That(
-                diagnostics.IndexOf(
-                    ExperimentalProfileId,
-                    StringComparison.Ordinal) < 0,
-                "Public diagnostics exposed a generated profile ID.");
-            Check.That(
-                diagnostics.IndexOf(
-                    Experimental48HzProfileGenerator
-                        .CreateAcknowledgementToken(ExperimentalProfileId),
-                    StringComparison.Ordinal) < 0,
-                "Public diagnostics exposed an acknowledgement token.");
-
-            ActionServiceHarness restoredExperimental =
-                new ActionServiceHarness();
-            restoredExperimental.DisplayStatus = new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.Restored,
-                ProfileId = ExperimentalProfileId,
-                ExperimentalProfile = true
-            };
-            restoredExperimental.DisplayCandidate =
-                new DisplayProfileCandidateStatus();
-            OptimizationStateSnapshot restoredExperimentalState =
-                restoredExperimental.Service.ReadState();
-            Check.Equal(string.Empty, restoredExperimentalState.DisplayProfileId);
-            Check.False(
-                restoredExperimentalState.DisplayProfileExperimental);
-            Check.That(
-                restoredExperimentalState
-                    .DisplayCandidateAcknowledgementToken == null,
-                "A stale restored profile must expose no acknowledgement token.");
-
-            ActionServiceHarness restoredReviewed = new ActionServiceHarness();
-            restoredReviewed.DisplayStatus = new DisplayOverrideStatus
-            {
-                State = ManagedResourceState.Restored,
-                ProfileId = ProfileCatalog.MacBookPro161Appa044ProfileId
-            };
-            restoredReviewed.DisplayCandidate =
-                new DisplayProfileCandidateStatus();
-            OptimizationStateSnapshot restoredReviewedState =
-                restoredReviewed.Service.ReadState();
-            Check.Equal(string.Empty, restoredReviewedState.DisplayProfileId);
-            Check.False(restoredReviewedState.DisplayProfileExperimental);
         }
 
         private static void TestActionServiceMapsAndVerifiesCpuPresets()
@@ -1286,39 +975,6 @@ namespace MacBookEco.Tests.App
                     ElevatedAdminHelper.FixedArguments(commands[index]));
             }
 
-            string token =
-                Experimental48HzProfileGenerator.CreateAcknowledgementToken(
-                    ExperimentalProfileId);
-            Check.Equal(
-                "install-experimental-display " + token,
-                ElevatedAdminHelper.FixedArguments(
-                    AdminCommand.InstallExperimentalDisplay,
-                    token));
-
-            Check.Throws<InvalidOperationException>(delegate
-            {
-                ElevatedAdminHelper.FixedArguments(
-                    AdminCommand.InstallExperimentalDisplay);
-            });
-            Check.Throws<InvalidOperationException>(delegate
-            {
-                ElevatedAdminHelper.FixedArguments(
-                    AdminCommand.InstallExperimentalDisplay,
-                    "a" + token.Substring(1));
-            });
-            Check.Throws<InvalidOperationException>(delegate
-            {
-                ElevatedAdminHelper.FixedArguments(
-                    AdminCommand.InstallExperimentalDisplay,
-                    token + " & remove-display");
-            });
-            Check.Throws<InvalidOperationException>(delegate
-            {
-                ElevatedAdminHelper.FixedArguments(
-                    AdminCommand.InstallDisplay,
-                    token);
-            });
-
             Check.Throws<InvalidOperationException>(
                 delegate
                 {
@@ -1715,125 +1371,6 @@ namespace MacBookEco.Tests.App
                 "display confirmation countdown must close at the deadline");
         }
 
-        private static void TestExperimentalRefreshRequiresJournalTarget()
-        {
-            Sha256Digest originalHash =
-                Sha256Digest.Compute(new byte[] { 1, 2, 3 });
-            Sha256Digest ownedHash =
-                Sha256Digest.Compute(new byte[] { 4, 5, 6 });
-            Sha256Digest foreignHash =
-                Sha256Digest.Compute(new byte[] { 7, 8, 9 });
-            MonitorIdentity journaled = new MonitorIdentity(
-                @"DISPLAY\APPA044\4&ABC&0&UID0",
-                "APPA044",
-                "APP",
-                originalHash);
-            MonitorIdentity originalCurrent = new MonitorIdentity(
-                @"DISPLAY\APPA044\4&ABC&0&UID0",
-                "APPA044",
-                "APP",
-                originalHash);
-            MonitorIdentity ownedCurrent = new MonitorIdentity(
-                @"DISPLAY\APPA044\4&ABC&0&UID0",
-                "APPA044",
-                "APP",
-                ownedHash);
-
-            Check.True(DisplayRefreshRateValidator.MatchesJournalTarget(
-                originalCurrent,
-                journaled,
-                ownedHash));
-            Check.True(DisplayRefreshRateValidator.MatchesJournalTarget(
-                ownedCurrent,
-                journaled,
-                ownedHash));
-            Check.False(DisplayRefreshRateValidator.MatchesJournalTarget(
-                new MonitorIdentity(
-                    @"DISPLAY\APPA044\4&OTHER&0&UID0",
-                    "APPA044",
-                    "APP",
-                    originalHash),
-                journaled,
-                ownedHash));
-            Check.False(DisplayRefreshRateValidator.MatchesJournalTarget(
-                new MonitorIdentity(
-                    @"DISPLAY\APPA045\4&ABC&0&UID0",
-                    "APPA045",
-                    "APP",
-                    originalHash),
-                journaled,
-                ownedHash));
-            Check.False(DisplayRefreshRateValidator.MatchesJournalTarget(
-                new MonitorIdentity(
-                    @"DISPLAY\APPA044\4&ABC&0&UID0",
-                    "APPA044",
-                    "APP",
-                    foreignHash),
-                journaled,
-                ownedHash));
-            Check.False(DisplayRefreshRateValidator.MatchesJournalTarget(
-                originalCurrent,
-                journaled,
-                null));
-        }
-
-        private static void TestInstallCommandPreservesRiskAcknowledgement()
-        {
-            string acknowledgementToken =
-                Experimental48HzProfileGenerator.CreateAcknowledgementToken(
-                    ExperimentalProfileId);
-            OptimizationCommand declined =
-                OptimizationCommand.InstallDisplaySupport();
-            OptimizationCommand accepted =
-                OptimizationCommand.InstallDisplaySupport(
-                    acknowledgementToken);
-
-            Check.Equal(
-                OptimizationCommandKind.InstallDisplaySupport,
-                declined.Kind);
-            Check.That(
-                declined.ExperimentalAcknowledgementToken == null,
-                "An ordinary install command must carry no consent token.");
-            Check.Equal(
-                acknowledgementToken,
-                accepted.ExperimentalAcknowledgementToken);
-
-            FakeActions actions = new FakeActions();
-            using (OptimizationCommandRunner runner =
-                new OptimizationCommandRunner(
-                    actions,
-                    null,
-                    TimeSpan.FromSeconds(1)))
-            {
-                ManualResetEvent completed = new ManualResetEvent(false);
-                runner.Completed += delegate
-                {
-                    completed.Set();
-                };
-
-                runner.Execute(declined);
-                Check.That(completed.WaitOne(1000),
-                    "the declined install command did not complete");
-                Check.Equal(
-                    1,
-                    actions.InstallAcknowledgementTokens.Count);
-                Check.That(
-                    actions.InstallAcknowledgementTokens[0] == null,
-                    "The command runner changed a missing token.");
-
-                completed.Reset();
-                runner.Execute(accepted);
-                Check.That(completed.WaitOne(1000),
-                    "the acknowledged install command did not complete");
-                Check.Equal(
-                    2,
-                    actions.InstallAcknowledgementTokens.Count);
-                Check.Equal(
-                    acknowledgementToken,
-                    actions.InstallAcknowledgementTokens[1]);
-            }
-        }
-
         private static void TestDisplaySupportUiPolicy()
         {
             OptimizationStateSnapshot installed = new OptimizationStateSnapshot(
@@ -1844,10 +1381,7 @@ namespace MacBookEco.Tests.App
                 "Installed",
                 "profile",
                 "read-back",
-                true,
-                false,
-                false,
-                "Reviewed profile details must remain hidden here.");
+                true);
             DisplaySupportUiState installedUi = DisplaySupportUiPolicy.Evaluate(
                 installed,
                 false,
@@ -1857,9 +1391,6 @@ namespace MacBookEco.Tests.App
                 && installedUi.CanInstall
                 && installedUi.ShowRemove
                 && installedUi.CanRemove
-                && installedUi.SupportText.IndexOf(
-                    "Reviewed profile details",
-                    StringComparison.Ordinal) < 0
                 && installedUi.InstallText == "Repair 48 Hz support",
                 "owned display support must expose 48 Hz, repair, and remove");
 
@@ -1898,131 +1429,11 @@ namespace MacBookEco.Tests.App
                 true);
             Check.That(!missingUi.CanSelect48Hz
                 && missingUi.CanSelect60Hz
-                && !missingUi.CanInstall
+                && missingUi.CanInstall
                 && !missingUi.ShowRemove
                 && !missingUi.CanRemove
                 && missingUi.InstallText == "Install 48 Hz support",
-                "a fresh install must stay disabled without a current candidate");
-
-            OptimizationStateSnapshot restoredWithoutCandidate =
-                new OptimizationStateSnapshot(
-                    true,
-                    false,
-                    null,
-                    "NotInstalled",
-                    "Restored",
-                    string.Empty,
-                    "read-back");
-            DisplaySupportUiState restoredWithoutCandidateUi =
-                DisplaySupportUiPolicy.Evaluate(
-                    restoredWithoutCandidate,
-                    false,
-                    true);
-            Check.That(!restoredWithoutCandidateUi.CanInstall
-                && restoredWithoutCandidateUi.CanSelect60Hz,
-                "a restored state must also require a current candidate");
-
-            OptimizationStateSnapshot reviewedCandidate =
-                new OptimizationStateSnapshot(
-                    true,
-                    false,
-                    null,
-                    "NotInstalled",
-                    "NotInstalled",
-                    "reviewed-static-profile",
-                    "read-back",
-                    false,
-                    true,
-                    false,
-                    "Reviewed profile for this exact hardware.");
-            DisplaySupportUiState reviewedCandidateUi =
-                DisplaySupportUiPolicy.Evaluate(
-                    reviewedCandidate,
-                    false,
-                    true);
-            Check.That(reviewedCandidateUi.CanInstall
-                && reviewedCandidateUi.InstallText == "Install 48 Hz support",
-                "an eligible reviewed candidate must enable the normal install");
-
-            const string DynamicProfileId =
-                "exp48-v1-mbp164-7360-"
-                    + "0123456789abcdef0123456789abcdef"
-                    + "0123456789abcdef0123456789abcdef";
-            const string RawEdidMarker = "00 FF FF FF FF FF FF 00";
-            const string DeviceInstanceMarker =
-                @"DISPLAY\APPLE123\PRIVATE-INSTANCE";
-            const string SafeCandidateSummary =
-                "Model MacBookPro16,4; panel APPA0AA; controlling GPU "
-                    + @"PCI\VEN_1002&DEV_7360; native 3072x1920 @ 60 Hz, "
-                    + "466.81 MHz, totals 3200x2016; calculated 48 Hz: "
-                    + "373.40 MHz, totals 3200x2431.";
-            OptimizationStateSnapshot experimentalCandidate =
-                new OptimizationStateSnapshot(
-                    true,
-                    false,
-                    null,
-                    "NotInstalled",
-                    "NotInstalled",
-                    DynamicProfileId,
-                    RawEdidMarker + " " + DeviceInstanceMarker,
-                    false,
-                    true,
-                    true,
-                    SafeCandidateSummary);
-            DisplaySupportUiState experimentalCandidateUi =
-                DisplaySupportUiPolicy.Evaluate(
-                    experimentalCandidate,
-                    false,
-                    true);
-            string experimentalPresentation =
-                experimentalCandidateUi.InstallText + "\n"
-                    + experimentalCandidateUi.SupportText;
-            Check.That(experimentalCandidateUi.CanInstall
-                && experimentalCandidateUi.InstallText.IndexOf(
-                    "experimental",
-                    StringComparison.OrdinalIgnoreCase) >= 0
-                && experimentalCandidateUi.SupportText.IndexOf(
-                    "not hardware verified",
-                    StringComparison.OrdinalIgnoreCase) >= 0
-                && experimentalCandidateUi.SupportText.IndexOf(
-                    SafeCandidateSummary,
-                    StringComparison.Ordinal) >= 0,
-                "an eligible generated candidate must be explicit and safe");
-            Check.That(experimentalPresentation.IndexOf(
-                    DynamicProfileId,
-                    StringComparison.OrdinalIgnoreCase) < 0
-                && experimentalPresentation.IndexOf(
-                    RawEdidMarker,
-                    StringComparison.OrdinalIgnoreCase) < 0
-                && experimentalPresentation.IndexOf(
-                    DeviceInstanceMarker,
-                    StringComparison.OrdinalIgnoreCase) < 0,
-                "candidate presentation must omit hashes, raw EDID, and device IDs");
-
-            OptimizationStateSnapshot ineligibleExperimental =
-                new OptimizationStateSnapshot(
-                    true,
-                    false,
-                    null,
-                    "NotInstalled",
-                    "NotInstalled",
-                    string.Empty,
-                    "read-back",
-                    false,
-                    false,
-                    true,
-                    SafeCandidateSummary);
-            DisplaySupportUiState ineligibleExperimentalUi =
-                DisplaySupportUiPolicy.Evaluate(
-                    ineligibleExperimental,
-                    false,
-                    true);
-            Check.That(
-                !ineligibleExperimentalUi.CanInstall &&
-                ineligibleExperimentalUi.SupportText.IndexOf(
-                    SafeCandidateSummary,
-                    StringComparison.Ordinal) < 0,
-                "an ineligible generated profile must not expose calculated details");
+                "missing display support must only offer install and native 60 Hz");
 
             DisplaySupportUiState externalUi = DisplaySupportUiPolicy.Evaluate(
                 notInstalled,
@@ -2476,10 +1887,6 @@ namespace MacBookEco.Tests.App
         {
             public readonly List<AdminCommand> AdminCommands =
                 new List<AdminCommand>();
-            public readonly List<string> AdminAcknowledgementTokens =
-                new List<string>();
-            public readonly Queue<DisplayOverrideStatus> DisplayStatuses =
-                new Queue<DisplayOverrideStatus>();
             public readonly WindowsOptimizationActionService Service;
             public OptimizationActionResult HelperResult =
                 OptimizationActionResult.Successful(
@@ -2493,20 +1900,9 @@ namespace MacBookEco.Tests.App
                     false);
             public DisplayOverrideStatus DisplayStatus =
                 new DisplayOverrideStatus();
-            public DisplayProfileCandidateStatus DisplayCandidate =
-                new DisplayProfileCandidateStatus
-                {
-                    Available = true,
-                    EligibleForInstall = true,
-                    Experimental = false,
-                    ReviewedProfileId =
-                        ProfileCatalog.MacBookPro161Appa044ProfileId,
-                    SafeSummary = "Reviewed candidate summary."
-                };
             public PowerSchemeStatus PowerStatus = new PowerSchemeStatus();
             public Exception DisplayStatusException;
             public int DisplayStatusReads;
-            public int DisplayCandidateReads;
             public int PowerStatusReads;
             public bool Display48HzAvailable;
             public int DisplayRefreshRate;
@@ -2526,8 +1922,7 @@ namespace MacBookEco.Tests.App
                     RunAdminCommand,
                     cpuHardwareSupport,
                     startupRecovery,
-                    Is48HzModeAvailable,
-                    ReadDisplayCandidate);
+                    Is48HzModeAvailable);
             }
 
             private OptimizationActionResult SetDisplayRefreshRate(
@@ -2549,16 +1944,7 @@ namespace MacBookEco.Tests.App
                     throw DisplayStatusException;
                 }
 
-                return DisplayStatuses.Count == 0
-                    ? DisplayStatus
-                    : DisplayStatuses.Dequeue();
-            }
-
-            private DisplayProfileCandidateStatus ReadDisplayCandidate(
-                string profileId)
-            {
-                DisplayCandidateReads++;
-                return DisplayCandidate;
+                return DisplayStatus;
             }
 
             private PowerSchemeStatus ReadPowerStatus()
@@ -2573,11 +1959,9 @@ namespace MacBookEco.Tests.App
             }
 
             private OptimizationActionResult RunAdminCommand(
-                AdminCommand command,
-                string acknowledgementToken)
+                AdminCommand command)
             {
                 AdminCommands.Add(command);
-                AdminAcknowledgementTokens.Add(acknowledgementToken);
                 return HelperResult;
             }
         }
@@ -2606,8 +1990,7 @@ namespace MacBookEco.Tests.App
                     false);
             }
 
-            public OptimizationActionResult InstallDisplaySupport(
-                string experimentalAcknowledgementToken = null)
+            public OptimizationActionResult InstallDisplaySupport()
             {
                 CallOrder.Add("repair-display");
                 return InstallResult;
@@ -2650,8 +2033,6 @@ namespace MacBookEco.Tests.App
         {
             public readonly ManualResetEvent CpuEntered = new ManualResetEvent(false);
             public readonly ManualResetEvent ReleaseCpu = new ManualResetEvent(false);
-            public readonly List<string> InstallAcknowledgementTokens =
-                new List<string>();
             public bool BlockCpu;
             public int CpuCalls;
             public int DisplayCalls;
@@ -2672,11 +2053,8 @@ namespace MacBookEco.Tests.App
                 return DisplayResult;
             }
 
-            public OptimizationActionResult InstallDisplaySupport(
-                string experimentalAcknowledgementToken = null)
+            public OptimizationActionResult InstallDisplaySupport()
             {
-                InstallAcknowledgementTokens.Add(
-                    experimentalAcknowledgementToken);
                 return OptimizationActionResult.Successful("install", OperationCode.None, false);
             }
 

@@ -142,12 +142,9 @@ namespace MacBookEco.Platform.Windows
                 path.MonitorFriendlyName,
                 matchingDevice.Description);
             info.Edid = CloneBytes(matchingDevice.Edid);
-            bool overrideReadSucceeded;
             info.ExistingEdidOverride = ReadExistingOverride(
                 matchingDevice,
-                warnings,
-                out overrideReadSucceeded);
-            info.ExistingEdidOverrideReadSucceeded = overrideReadSucceeded;
+                warnings);
 
             try
             {
@@ -174,10 +171,8 @@ namespace MacBookEco.Platform.Windows
         /// </summary>
         private static byte[] ReadExistingOverride(
             MonitorDeviceRecord monitor,
-            IList<string> warnings,
-            out bool readSucceeded)
+            IList<string> warnings)
         {
-            readSucceeded = false;
             try
             {
                 using (SafeRegistryHandle deviceKey =
@@ -185,9 +180,7 @@ namespace MacBookEco.Platform.Windows
                         monitor,
                         DisplayTopologyNativeMethods.KEY_READ))
                 {
-                    byte[] value = CloneBytes(EdidOverrideRegistry.Read(deviceKey));
-                    readSucceeded = true;
-                    return value;
+                    return CloneBytes(EdidOverrideRegistry.Read(deviceKey));
                 }
             }
             catch (Exception ex)

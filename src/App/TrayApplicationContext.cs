@@ -114,7 +114,7 @@ namespace MacBookEco.App
             _installDisplayItem = TrackMutation(
                 new ToolStripMenuItem("Install 48 Hz support..."));
             _installDisplayItem.Click += delegate {
-                InstallDisplaySupport();
+                RunCommand(OptimizationCommand.InstallDisplaySupport());
             };
             displayMenu.DropDownItems.Add(_installDisplayItem);
 
@@ -353,33 +353,6 @@ namespace MacBookEco.App
         private void RunCommand(OptimizationCommand command)
         {
             _runner.Execute(command);
-        }
-
-        private void InstallDisplaySupport()
-        {
-            if (RefuseWhenBusy())
-            {
-                return;
-            }
-
-            OptimizationStateSnapshot state = _stateMonitor.Current;
-            string acknowledgementToken = null;
-            if (state != null && state.DisplayProfileExperimental &&
-                state.DisplayCandidateEligible)
-            {
-                acknowledgementToken =
-                    state.DisplayCandidateAcknowledgementToken;
-                if (string.IsNullOrEmpty(acknowledgementToken) ||
-                    !DestructiveConfirmation.InstallExperimentalDisplaySupport(
-                        _dashboard,
-                        state.DisplayCandidateSummary))
-                {
-                    return;
-                }
-            }
-
-            RunCommand(OptimizationCommand.InstallDisplaySupport(
-                acknowledgementToken));
         }
 
         private void OnRunnerStateChanged(

@@ -10,23 +10,7 @@ namespace MacBookEco.Core
             "macbookpro16-1-appa044-48hz";
 
         private static readonly ReadOnlyCollection<DisplayProfile> Profiles =
-            Array.AsReadOnly(
-                new[]
-                {
-                    new DisplayProfile(
-                        MacBookPro161Appa044ProfileId,
-                        "MacBook Pro 16-inch 2019 / APPA044",
-                        new[] { "MacBookPro16,1" },
-                        "APPA044",
-                        "CDA0E18080DE8CAC744C66A5374A53CBBA1999115FA5FE2DBD949980649AF3F5",
-                        DetailedTiming.ParseHex(
-                            "E7 91 00 50 C0 80 37 70 08 20 98 08 59 D7 10 00 00 1A"),
-                        DetailedTiming.ParseHex(
-                            "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A"),
-                        "AMD Radeon Pro 5300M",
-                        "PCI\\VEN_1002&DEV_7340",
-                        "30.0.13045.22003")
-                });
+            Array.AsReadOnly(GeneratedProfileCatalog.Create());
 
         public static ReadOnlyCollection<DisplayProfile> All => Profiles;
 

@@ -31,12 +31,6 @@ namespace MacBookEco.Platform.Windows
             EdidBaseBlock edid =
                 HardwareDiscoveryService.CreateCoreEdid(InternalDisplay.Edid);
             WindowsDisplayAdapterInfo adapter = DisplayAdapter;
-            bool completeEdidIsValid =
-                EdidBaseBlock.HasValidCompleteDocument(InternalDisplay.Edid);
-            Sha256Digest sourceEdidSignature = completeEdidIsValid
-                ? EdidBaseBlock.ComputeNormalizedDocumentSignature(
-                    InternalDisplay.Edid)
-                : null;
             return new HardwareSnapshot(
                 SystemManufacturer,
                 AppleModel,
@@ -45,9 +39,7 @@ namespace MacBookEco.Platform.Windows
                 edid,
                 adapter == null ? null : adapter.Description,
                 adapter == null ? null : adapter.DeviceInstanceId,
-                adapter == null ? null : adapter.DriverVersion,
-                completeEdidIsValid,
-                sourceEdidSignature);
+                adapter == null ? null : adapter.DriverVersion);
         }
     }
 
@@ -63,7 +55,6 @@ namespace MacBookEco.Platform.Windows
         public string RegistryDevicePath { get; internal set; }
         public byte[] Edid { get; internal set; }
         public byte[] ExistingEdidOverride { get; internal set; }
-        public bool ExistingEdidOverrideReadSucceeded { get; internal set; }
         public string EdidManufacturerCode { get; internal set; }
         public ushort EdidProductCode { get; internal set; }
         public int NativeWidth { get; internal set; }

@@ -4,12 +4,6 @@ using System.Collections.ObjectModel;
 
 namespace MacBookEco.Core
 {
-    public enum DisplayProfileKind
-    {
-        Verified = 1,
-        Experimental = 2
-    }
-
     public sealed class DisplayProfile
     {
         private readonly string[] _systemModels;
@@ -25,35 +19,6 @@ namespace MacBookEco.Core
             string verifiedGpuName,
             string verifiedGpuDeviceIdPrefix,
             string verifiedDriverVersion)
-            : this(
-                id,
-                displayName,
-                systemModels,
-                panelHardwareId,
-                normalizedEdidSignature,
-                nativeTiming,
-                targetTiming,
-                verifiedGpuName,
-                verifiedGpuDeviceIdPrefix,
-                verifiedDriverVersion,
-                DisplayProfileKind.Verified,
-                normalizedEdidSignature)
-        {
-        }
-
-        internal DisplayProfile(
-            string id,
-            string displayName,
-            string[] systemModels,
-            string panelHardwareId,
-            string normalizedEdidSignature,
-            DetailedTiming nativeTiming,
-            DetailedTiming targetTiming,
-            string verifiedGpuName,
-            string verifiedGpuDeviceIdPrefix,
-            string verifiedDriverVersion,
-            DisplayProfileKind kind,
-            string sourceEdidSignature)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
@@ -83,8 +48,6 @@ namespace MacBookEco.Core
             {
                 NormalizedEdidSignature =
                     Sha256Digest.ParseHex(normalizedEdidSignature);
-                SourceEdidSignature =
-                    Sha256Digest.ParseHex(sourceEdidSignature);
             }
             catch (FormatException exception)
             {
@@ -102,12 +65,6 @@ namespace MacBookEco.Core
             if (targetTiming == null)
             {
                 throw new ArgumentNullException(nameof(targetTiming));
-            }
-
-            if (kind != DisplayProfileKind.Verified &&
-                kind != DisplayProfileKind.Experimental)
-            {
-                throw new ArgumentOutOfRangeException(nameof(kind));
             }
 
             if (
@@ -140,7 +97,6 @@ namespace MacBookEco.Core
             VerifiedGpuName = NormalizeOptional(verifiedGpuName);
             VerifiedGpuDeviceIdPrefix = NormalizeOptional(verifiedGpuDeviceIdPrefix);
             VerifiedDriverVersion = NormalizeOptional(verifiedDriverVersion);
-            Kind = kind;
         }
 
         public string Id { get; private set; }
@@ -151,8 +107,6 @@ namespace MacBookEco.Core
 
         public Sha256Digest NormalizedEdidSignature { get; private set; }
 
-        public Sha256Digest SourceEdidSignature { get; private set; }
-
         public DetailedTiming NativeTiming { get; private set; }
 
         public DetailedTiming TargetTiming { get; private set; }
@@ -162,10 +116,6 @@ namespace MacBookEco.Core
         public string VerifiedGpuDeviceIdPrefix { get; private set; }
 
         public string VerifiedDriverVersion { get; private set; }
-
-        public DisplayProfileKind Kind { get; private set; }
-
-        public bool IsExperimental => Kind == DisplayProfileKind.Experimental;
 
         public DisplayProfileMatch Match(HardwareSnapshot hardware)
         {
@@ -216,15 +166,6 @@ namespace MacBookEco.Core
                 rejectionReasons.Add("The normalized EDID signature does not match.");
             }
 
-            if (IsExperimental &&
-                hardware.NormalizedSourceEdidSignature != null &&
-                !hardware.NormalizedSourceEdidSignature.Equals(
-                    SourceEdidSignature))
-            {
-                rejectionReasons.Add(
-                    "The normalized complete EDID signature does not match.");
-            }
-
             if (!hardware.NativeTiming.Equals(NativeTiming))
             {
                 rejectionReasons.Add("The preferred native detailed timing does not match.");
@@ -255,7 +196,7 @@ namespace MacBookEco.Core
             if (!match.HardwareSupported)
             {
                 throw new InvalidOperationException(
-                    "The hardware does not match the selected display profile.");
+                    "The hardware does not match the verified display profile.");
             }
 
             if (!match.CanInstall)
@@ -264,19 +205,7 @@ namespace MacBookEco.Core
                     "The matching EDID cannot safely receive the owned override.");
             }
 
-            return CompileOverride(hardware.Edid);
-        }
-
-        internal EdidBaseBlock CompileOverride(EdidBaseBlock baseEdid)
-        {
-            if (baseEdid == null)
-            {
-                throw new ArgumentNullException(nameof(baseEdid));
-            }
-
-            return IsExperimental
-                ? baseEdid.InsertOrderedDetailedTiming(TargetTiming)
-                : baseEdid.InsertDetailedTiming(TargetTiming);
+            return hardware.Edid.InsertDetailedTiming(TargetTiming);
         }
 
         private bool ContainsSystemModel(string value)
@@ -305,8 +234,7 @@ namespace MacBookEco.Core
             {
                 if (string.IsNullOrEmpty(hardware.GpuName))
                 {
-                    warnings.Add(
-                        "GPU name is unavailable; the profile GPU could not be checked.");
+                    warnings.Add("GPU name is unavailable; the verified GPU could not be checked.");
                 }
                 else if (
                     hardware.GpuName.IndexOf(
@@ -322,7 +250,7 @@ namespace MacBookEco.Core
                 if (string.IsNullOrEmpty(hardware.GpuDeviceId))
                 {
                     rejectionReasons.Add(
-                        "GPU device ID is unavailable; the profile adapter is required.");
+                        "GPU device ID is unavailable; the verified adapter is required.");
                 }
                 else if (
                     !hardware.GpuDeviceId.StartsWith(

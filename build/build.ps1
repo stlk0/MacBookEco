@@ -11,16 +11,26 @@ $solutionPath = Join-Path $repoRoot "MacBookEco.sln"
 $outputDirectory = Join-Path $PSScriptRoot "out"
 $versionPath = Join-Path $repoRoot "VERSION"
 $globalJsonPath = Join-Path $repoRoot "global.json"
+$profileCatalogCheck = Join-Path `
+    $repoRoot `
+    "tools\Generate-ProfileCatalog.ps1"
 
 if ($env:OS -ne "Windows_NT") {
     throw "MacBook Eco builds require Windows and .NET Framework 4.8."
 }
 
-foreach ($requiredPath in @($solutionPath, $versionPath, $globalJsonPath)) {
+foreach ($requiredPath in @(
+        $solutionPath,
+        $versionPath,
+        $globalJsonPath,
+        $profileCatalogCheck
+    )) {
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
         throw "Required build input was not found: $requiredPath"
     }
 }
+
+& $profileCatalogCheck -Check
 
 $dotnet = Get-Command "dotnet.exe" -ErrorAction SilentlyContinue
 if ($null -eq $dotnet) {

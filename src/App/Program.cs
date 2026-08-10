@@ -253,7 +253,6 @@ namespace MacBookEco.App
                 return new WindowsOptimizationActionService(
                     displayRefresh,
                     new EdidStatusReader(),
-                    new DisplayProfileCandidateReader(),
                     new PowerStatusReader(),
                     adminHelper,
                     cpuHardwareSupport,

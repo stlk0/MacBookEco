@@ -35,8 +35,8 @@
     <Compile Include="..\src\Core\MonitorIdentity.cs" />
     <Compile Include="..\src\Core\PowerRecoveryPolicy.cs" />
     <Compile Include="..\src\Core\Sha256Digest.cs" />
-    <Compile Include="..\src\DisplayProfiles\Experimental48HzProfileGenerator.cs" />
     <Compile Include="..\src\DisplayProfiles\ProfileCatalog.cs" />
+    <Compile Include="..\src\DisplayProfiles\ProfileCatalog.Generated.cs" />
     <Compile Include="..\src\Platform.Windows\DisplayModeNativeMethods.cs" />
     <Compile Include="..\src\Platform.Windows\DisplayModeService.cs" />
     <Compile Include="..\src\Platform.Windows\EdidOverrideService.cs" />

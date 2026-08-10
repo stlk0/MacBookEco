@@ -31,7 +31,6 @@ namespace MacBookEco.Core
         private const byte EdidNormalizedEdidHashField = 5;
         private const byte EdidOwnedOverrideHashField = 6;
         private const byte EdidOriginalOverrideAbsentField = 7;
-        private const byte EdidSourceEdidSignatureField = 8;
 
         private const byte PowerOriginalSchemeIdField = 1;
         private const byte PowerOwnedSchemeIdField = 2;
@@ -232,12 +231,6 @@ namespace MacBookEco.Core
                 EdidOwnedOverrideHashField,
                 payload.OwnedOverrideHash.ToString()));
             fields.Add(new JournalField(EdidOriginalOverrideAbsentField, "1"));
-            if (payload.SourceEdidSignature != null)
-            {
-                fields.Add(new JournalField(
-                    EdidSourceEdidSignatureField,
-                    payload.SourceEdidSignature.ToString()));
-            }
         }
 
         private static void BuildPowerFields(
@@ -298,33 +291,15 @@ namespace MacBookEco.Core
                     null);
             }
 
-            bool hasSourceEdidSignature =
-                fields.ContainsKey(EdidSourceEdidSignatureField);
-            if (hasSourceEdidSignature)
-            {
-                RequireExactFields(
-                    fields,
-                    EdidProfileIdField,
-                    EdidMonitorInstanceIdField,
-                    EdidPanelHardwareIdField,
-                    EdidManufacturerCodeField,
-                    EdidNormalizedEdidHashField,
-                    EdidOwnedOverrideHashField,
-                    EdidOriginalOverrideAbsentField,
-                    EdidSourceEdidSignatureField);
-            }
-            else
-            {
-                RequireExactFields(
-                    fields,
-                    EdidProfileIdField,
-                    EdidMonitorInstanceIdField,
-                    EdidPanelHardwareIdField,
-                    EdidManufacturerCodeField,
-                    EdidNormalizedEdidHashField,
-                    EdidOwnedOverrideHashField,
-                    EdidOriginalOverrideAbsentField);
-            }
+            RequireExactFields(
+                fields,
+                EdidProfileIdField,
+                EdidMonitorInstanceIdField,
+                EdidPanelHardwareIdField,
+                EdidManufacturerCodeField,
+                EdidNormalizedEdidHashField,
+                EdidOwnedOverrideHashField,
+                EdidOriginalOverrideAbsentField);
             if (!string.Equals(
                     Required(fields, EdidOriginalOverrideAbsentField),
                     "1",
@@ -344,11 +319,7 @@ namespace MacBookEco.Core
             var payload = new EdidJournalPayload(
                 target,
                 Sha256Digest.ParseCanonical(
-                    Required(fields, EdidOwnedOverrideHashField)),
-                hasSourceEdidSignature
-                    ? Sha256Digest.ParseCanonical(
-                        Required(fields, EdidSourceEdidSignatureField))
-                    : null);
+                    Required(fields, EdidOwnedOverrideHashField)));
             return new EdidJournal(
                 operationId,
                 generation,

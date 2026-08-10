@@ -68,11 +68,7 @@ namespace MacBookEco.App
             string displaySupportState,
             string displayProfileId,
             string detail,
-            bool display48HzAvailable = false,
-            bool displayCandidateEligible = false,
-            bool displayProfileExperimental = false,
-            string displayCandidateSummary = null,
-            string displayCandidateAcknowledgementToken = null)
+            bool display48HzAvailable = false)
         {
             Available = available;
             CpuProfileActive = cpuProfileActive;
@@ -82,11 +78,6 @@ namespace MacBookEco.App
             DisplayProfileId = displayProfileId ?? string.Empty;
             Detail = detail ?? string.Empty;
             Display48HzAvailable = display48HzAvailable;
-            DisplayCandidateEligible = displayCandidateEligible;
-            DisplayProfileExperimental = displayProfileExperimental;
-            DisplayCandidateSummary = displayCandidateSummary ?? string.Empty;
-            DisplayCandidateAcknowledgementToken =
-                displayCandidateAcknowledgementToken;
         }
 
         public bool Available { get; private set; }
@@ -97,13 +88,6 @@ namespace MacBookEco.App
         public string DisplayProfileId { get; private set; }
         public string Detail { get; private set; }
         public bool Display48HzAvailable { get; private set; }
-        public bool DisplayCandidateEligible { get; private set; }
-        public bool DisplayProfileExperimental { get; private set; }
-        public string DisplayCandidateSummary { get; private set; }
-        internal string DisplayCandidateAcknowledgementToken {
-            get;
-            private set;
-        }
 
         public static OptimizationStateSnapshot Unavailable(string detail)
         {
@@ -119,9 +103,9 @@ namespace MacBookEco.App
     }
 
     /// <summary>
-    /// The wording of safety confirmations shared by the tray menu and the
-    /// dashboard. When each surface kept its own copy of these commands, the
-    /// wording had already drifted apart.
+    /// The wording of the two destructive confirmations, shared by the tray
+    /// menu and the dashboard. Both offer the same two commands, and when each
+    /// kept its own copy of the text the two had already drifted apart.
     /// </summary>
     public static class DestructivePrompts
     {
@@ -138,17 +122,6 @@ namespace MacBookEco.App
             "Restore the exact Windows power plan that was active before "
             + "MacBook Eco? The app-owned plan will be retained for manual "
             + "cleanup.";
-
-        public const string InstallExperimentalDisplaySupportTitle =
-            "Install experimental 48 Hz profile";
-
-        public const string InstallExperimentalDisplaySupport =
-            "This locally calculated 48 Hz profile is experimental and has not "
-            + "been verified on this hardware. Incorrect display timings can "
-            + "cause a blank or unstable screen.\r\n\r\n"
-            + "The elevated helper will independently recheck the hardware, and "
-            + "the first 48 Hz transition will remain temporary until you confirm "
-            + "the picture.\r\n\r\n";
     }
 
     public sealed class OptimizationActionResult
@@ -285,8 +258,7 @@ namespace MacBookEco.App
             Func<DisplayModeConfirmationRequest, DisplayModeConfirmationDecision>
                 confirmation);
 
-        OptimizationActionResult InstallDisplaySupport(
-            string experimentalAcknowledgementToken = null);
+        OptimizationActionResult InstallDisplaySupport();
 
         OptimizationActionResult RemoveDisplaySupport();
 
@@ -335,8 +307,7 @@ namespace MacBookEco.App
                 Explanation);
         }
 
-        public OptimizationActionResult InstallDisplaySupport(
-            string experimentalAcknowledgementToken = null)
+        public OptimizationActionResult InstallDisplaySupport()
         {
             return OptimizationActionResult.Unsupported(
                 OperationCode.UnsupportedCapability,

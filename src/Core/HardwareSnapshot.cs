@@ -13,31 +13,6 @@ namespace MacBookEco.Core
             string gpuName,
             string gpuDeviceId,
             string driverVersion)
-            : this(
-                systemManufacturer,
-                systemModel,
-                isInternalDisplay,
-                panelHardwareId,
-                edid,
-                gpuName,
-                gpuDeviceId,
-                driverVersion,
-                false,
-                null)
-        {
-        }
-
-        public HardwareSnapshot(
-            string systemManufacturer,
-            string systemModel,
-            bool isInternalDisplay,
-            string panelHardwareId,
-            EdidBaseBlock edid,
-            string gpuName,
-            string gpuDeviceId,
-            string driverVersion,
-            bool completeEdidIsValid,
-            Sha256Digest normalizedSourceEdidSignature)
         {
             if (string.IsNullOrWhiteSpace(systemModel))
             {
@@ -56,19 +31,6 @@ namespace MacBookEco.Core
                 throw new ArgumentNullException(nameof(edid));
             }
 
-            if (completeEdidIsValid && normalizedSourceEdidSignature == null)
-            {
-                throw new ArgumentNullException(
-                    nameof(normalizedSourceEdidSignature));
-            }
-
-            if (!completeEdidIsValid && normalizedSourceEdidSignature != null)
-            {
-                throw new ArgumentException(
-                    "An invalid EDID document cannot carry a source signature.",
-                    nameof(normalizedSourceEdidSignature));
-            }
-
             SystemManufacturer = NormalizeText(systemManufacturer);
             SystemModel = NormalizeText(systemModel);
             IsInternalDisplay = isInternalDisplay;
@@ -77,8 +39,6 @@ namespace MacBookEco.Core
             GpuName = NormalizeText(gpuName);
             GpuDeviceId = NormalizeText(gpuDeviceId);
             DriverVersion = NormalizeText(driverVersion);
-            CompleteEdidIsValid = completeEdidIsValid;
-            NormalizedSourceEdidSignature = normalizedSourceEdidSignature;
         }
 
         public string SystemManufacturer { get; private set; }
@@ -100,10 +60,6 @@ namespace MacBookEco.Core
         public string GpuDeviceId { get; private set; }
 
         public string DriverVersion { get; private set; }
-
-        public bool CompleteEdidIsValid { get; private set; }
-
-        public Sha256Digest NormalizedSourceEdidSignature { get; private set; }
 
         public static string NormalizePanelHardwareId(string value)
         {

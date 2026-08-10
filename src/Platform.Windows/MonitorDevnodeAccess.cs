@@ -2,7 +2,6 @@ using System;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.InteropServices;
-using MacBookEco.Core;
 using Microsoft.Win32.SafeHandles;
 
 namespace MacBookEco.Platform.Windows
@@ -25,8 +24,7 @@ namespace MacBookEco.Platform.Windows
         /// </summary>
         internal static SafeRegistryHandle OpenExactDeviceParameters(
             MonitorDeviceRecord expected,
-            int registryAccess,
-            Sha256Digest expectedSourceEdidSignature = null)
+            int registryAccess)
         {
             if (expected == null)
             {
@@ -76,16 +74,6 @@ namespace MacBookEco.Platform.Windows
                 {
                     throw new SecureStateConflictException(
                         "The re-resolved monitor devnode does not match the durable EDID identity.");
-                }
-
-                if (expectedSourceEdidSignature != null &&
-                    (!EdidBaseBlock.HasValidCompleteDocument(actual.Edid) ||
-                     !expectedSourceEdidSignature.Equals(
-                        EdidBaseBlock.ComputeNormalizedDocumentSignature(
-                            actual.Edid))))
-                {
-                    throw new SecureStateConflictException(
-                        "The complete source EDID changed before the experimental write.");
                 }
 
                 SafeRegistryHandle deviceKey =

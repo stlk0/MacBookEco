@@ -262,14 +262,6 @@ namespace MacBookEco.Core
         public EdidJournalPayload(
             EdidTargetIdentity target,
             Sha256Digest ownedOverrideHash)
-            : this(target, ownedOverrideHash, null)
-        {
-        }
-
-        public EdidJournalPayload(
-            EdidTargetIdentity target,
-            Sha256Digest ownedOverrideHash,
-            Sha256Digest sourceEdidSignature)
         {
             if (target == null)
             {
@@ -283,14 +275,11 @@ namespace MacBookEco.Core
 
             Target = target;
             OwnedOverrideHash = ownedOverrideHash;
-            SourceEdidSignature = sourceEdidSignature;
         }
 
         public EdidTargetIdentity Target { get; private set; }
 
         public Sha256Digest OwnedOverrideHash { get; private set; }
-
-        public Sha256Digest SourceEdidSignature { get; private set; }
     }
 
     public sealed class EdidJournal : JournalEnvelope
@@ -378,13 +367,10 @@ namespace MacBookEco.Core
             }
             else if (Payload != null &&
                 (!Payload.Target.Equals(nextPayload.Target) ||
-                !Payload.OwnedOverrideHash.Equals(nextPayload.OwnedOverrideHash) ||
-                !OptionalDigestEquals(
-                    Payload.SourceEdidSignature,
-                    nextPayload.SourceEdidSignature)))
+                !Payload.OwnedOverrideHash.Equals(nextPayload.OwnedOverrideHash)))
             {
                 throw new ArgumentException(
-                    "A journal transition cannot change EDID identity or ownership facts.",
+                    "A journal transition cannot change the EDID target identity or ownership hash.",
                     nameof(nextPayload));
             }
 
@@ -395,18 +381,6 @@ namespace MacBookEco.Core
                 updatedUtc,
                 nextState,
                 nextPayload);
-        }
-
-        private static bool OptionalDigestEquals(
-            Sha256Digest first,
-            Sha256Digest second)
-        {
-            if (first == null || second == null)
-            {
-                return first == null && second == null;
-            }
-
-            return first.Equals(second);
         }
 
         /// <summary>

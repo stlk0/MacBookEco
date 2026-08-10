@@ -10,8 +10,7 @@ namespace MacBookEco.Admin
     /// <summary>
     /// One-shot elevated helper. The parser intentionally exposes no generic
     /// file, registry, device-instance, GUID, shell-command or numeric-setting
-    /// argument. The experimental install accepts only one canonical digest
-    /// used to compare explicit consent with the freshly generated profile.
+    /// argument.
     /// </summary>
     internal static class Program
     {
@@ -40,22 +39,6 @@ namespace MacBookEco.Admin
                         RequireArgumentCount(args, 1);
                         EdidOverrideOperationResult installResult =
                             new EdidOverrideService().InstallVerifiedProfile();
-                        TryPrint(
-                            delegate {
-                                PrintDisplayResult(installResult);
-                            });
-                        int installExit = installResult.Succeeded
-                            ? AdminHelperExitCodes.Success
-                            : AdminHelperExitCodes.Indeterminate;
-                        return installExit;
-                    }
-
-                    case "install-experimental-display":
-                    {
-                        RequireArgumentCount(args, 2);
-                        EdidOverrideOperationResult installResult =
-                            new EdidOverrideService()
-                                .InstallExperimentalProfile(args[1]);
                         TryPrint(
                             delegate {
                                 PrintDisplayResult(installResult);
@@ -237,8 +220,7 @@ namespace MacBookEco.Admin
                 new EdidStatusReader().Read();
             Console.WriteLine("displayJournal.state=" + displayStatus.State);
             Console.WriteLine(
-                "displayJournal.profile=" + SafeProfileId(
-                    displayStatus.ProfileId));
+                "displayJournal.profile=" + Safe(displayStatus.ProfileId));
 
             try
             {
@@ -257,7 +239,7 @@ namespace MacBookEco.Admin
         {
             Console.WriteLine("ok=" + result.Succeeded);
             Console.WriteLine("outcome=" + result.Outcome);
-            Console.WriteLine("profile=" + SafeProfileId(result.ProfileId));
+            Console.WriteLine("profile=" + Safe(result.ProfileId));
             Console.WriteLine(
                 "deviceReloadRequired=" + result.DeviceReloadRequired);
             Console.WriteLine("message=" + Safe(result.Message));
@@ -335,20 +317,11 @@ namespace MacBookEco.Admin
             return value.Replace("\r", " ").Replace("\n", " ");
         }
 
-        private static string SafeProfileId(string value)
-        {
-            return Experimental48HzProfileGenerator.IsExperimentalProfileId(value)
-                ? "experimental-local-48hz"
-                : Safe(value);
-        }
-
         private static void PrintUsage()
         {
             Console.Error.WriteLine("MacBookEco.Admin commands:");
             Console.Error.WriteLine("  diagnose");
             Console.Error.WriteLine("  install-display");
-            Console.Error.WriteLine(
-                "  install-experimental-display <acknowledgement-token>");
             Console.Error.WriteLine("  remove-display");
             Console.Error.WriteLine("  apply-power normal|cool|battery");
             Console.Error.WriteLine("  restore-power");

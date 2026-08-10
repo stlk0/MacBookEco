@@ -185,7 +185,7 @@ Image size: 345 x 215 mm
 
 The reviewed added 48 Hz DTD remains documented in
 [SUPPORTED_HARDWARE.md](../SUPPORTED_HARDWARE.md). It is a static reviewed
-profile and takes priority over local generation.
+profile and is the only display profile enabled for this panel identity.
 
 Apple display override resource names need careful interpretation. Raw
 `DisplayVendorID` `0x0610` represents manufacturer `APP`, and a resource such as
@@ -210,8 +210,8 @@ of those raw values and the resource path is the [APPA030 report][panel-a030-raw
 - Apple's advertised 48 Hz modes on the 16-inch model establish intended panel
   capability under Apple's supported software. They do not prove that Windows
   exposes 48 Hz, that a particular EDID has room for another DTD, or that a
-  generated override is safe.
-- No generated profile was validated on Windows, in the hostile-state VM
+  calculated override is safe.
+- No calculated proposal was validated on Windows, in the hostile-state VM
   matrix, or on real hardware as part of this research.
 
 ## Exclusions
@@ -231,55 +231,27 @@ This catalog intentionally excludes:
 
 ## Runtime policy
 
-The research catalog is broader than the executable generator allowlist. Only
-these exact model and PCI pairs are generator-allowlisted:
+This research catalog is intentionally broader than the executable profile
+catalog. Public model, GPU, resolution, or panel-family evidence is not enough
+to enable a display mutation. MacBook Eco has no runtime timing generator and
+does not load profiles from disk.
 
-```text
-MacBookPro16,1 + PCI\VEN_1002&DEV_7340
-MacBookPro16,4 + PCI\VEN_1002&DEV_7360
-```
+The only runtime profiles are reviewed manifests compiled into a release. Each
+must bind the exact SMBIOS model, panel product ID, normalized original EDID,
+native DTD, controlling GPU device ID, and reviewed 48 Hz DTD. The installed app
+then applies the existing fail-closed topology, ownership, intent-before-write,
+read-back, rollback, and recovery rules.
 
-Apple identifies both as 16-inch Intel MacBook Pro configurations, and the
-[official 16-inch specifications][apple-16-2019] advertise 47.95, 48, 50,
-59.94, and 60 Hz modes; Apple's [refresh-rate guidance][apple-refresh-rates]
-also lists those selectable rates. Exact public inventories corroborate
-`1002:7340` on `MacBookPro16,1` and `1002:7360` on `MacBookPro16,4`. That
-evidence justifies a narrow eligibility prefilter; it is not acceptance of any
-generated profile.
+The offline utility described in
+[`profiles/README.md`](../profiles/README.md) can reduce a complete EDID to a
+review proposal and calculate a candidate DTD. Its output is neither installed
+nor treated as supported hardware. A profile becomes eligible only after its
+evidence and hardware acceptance are reviewed and the manifest is compiled into
+a later build.
 
-On `MacBookPro16,1`, the exact reviewed `APPA044` static profile remains the
-priority path whenever all of its reviewed identity facts match. It is never
-replaced by or silently migrated to a generated candidate.
-
-Every experimental candidate must still pass all live fail-closed checks,
-including:
-
-- exact `Apple Inc.` SMBIOS manufacturer, allowlisted model, and canonical
-  controlling-adapter PCI pair;
-- one unambiguous internal panel with a stable physical identity and matching
-  live topology;
-- a complete valid EDID document, exact panel ID, valid preferred native DTD from
-  59 through 61 Hz, and a free nonpreferred descriptor;
-- no foreign EDID override and no unresolved override-read state;
-- an exactly encodable 48 Hz DTD whose sync remains inside blanking, whose
-  pixel clock does not exceed native, and whose encoded refresh satisfies the
-  generator tolerance;
-- independent elevated-helper rediscovery before every forward write and
-  reproduction of the same model, live adapter, panel, normalized original
-  EDID, native DTD, recipe, and expected owned override;
-- intent recorded before mutation, exact byte-for-byte read-back, bounded
-  protected state, compare-before-restore ownership, and a verified native
-  recovery mode before a temporary display switch.
-
-Offline removal does not depend on an active adapter route. It regenerates the
-candidate from fresh SMBIOS and durable monitor facts plus the profile-bound
-canonical GPU pair, then deletes only when the recompiled ownership hash and
-exact live override bytes both match. This is a recovery path, not a new
-eligibility decision.
-
-Failure or ambiguity at any gate leaves the machine read-only. There is no
-fallback based on GPU vendor alone, marketing name, resolution, panel family,
-or a nearby SMBIOS model.
+At present, only the existing `MacBookPro16,1` / `APPA044` profile meets that
+bar. The `MacBookPro16,4` and all other catalog rows remain read-only until an
+exact panel/EDID profile completes the same review.
 
 ## Privacy and source hygiene
 
@@ -315,7 +287,6 @@ version control.
 [apple-15-2018]: https://support.apple.com/en-us/111949
 [apple-15-2019]: https://support.apple.com/en-us/111941
 [apple-16-2019]: https://support.apple.com/en-ie/111932
-[apple-refresh-rates]: https://support.apple.com/en-ie/102297
 [everymac-identifiers]: https://everymac.com/systems/by-identifier/all-macbook-pro-model-identifiers.html
 [core-duo-32-bit]: https://www.notebookcheck.net/Intel-Core-Duo-T2600-Notebook-Processor.35155.0.html
 [pci-2-2]: https://answers.launchpad.net/ubuntu/%2Bsource/alsa-driver/%2Bquestion/691576

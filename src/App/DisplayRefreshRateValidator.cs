@@ -5,8 +5,8 @@ using MacBookEco.Platform.Windows;
 namespace MacBookEco.App
 {
     /// <summary>
-    /// Resolves and validates the app-owned internal-panel profile before any
-    /// display mode change. This class does not mutate Windows state.
+    /// Resolves and validates the reviewed internal panel before any display
+    /// mode change. This class does not mutate Windows state.
     /// </summary>
     internal sealed class DisplayRefreshRateValidator
     {
@@ -80,160 +80,45 @@ namespace MacBookEco.App
             }
 
             // Native 60 Hz is a recovery action. Entering 48 Hz additionally
-            // requires exact app-owned override bytes for this panel.
+            // requires exact reviewed override bytes for this panel.
             if (refreshRateHz == 48)
             {
                 try
                 {
                     HardwareSnapshot coreHardware = hardware.ToCoreSnapshot();
-                    ProfileSelectionResult reviewedSelection =
+                    ProfileSelectionResult selection =
                         ProfileCatalog.Select(coreHardware);
-                    DisplayProfile profile = reviewedSelection.HardwareSupported
-                        ? reviewedSelection.Profile
-                        : null;
-                    if (profile == null)
+                    if (!selection.HardwareSupported)
                     {
-                        DisplayOverrideStatus status =
-                            new EdidStatusReader().Read();
-                        if (status.State != ManagedResourceState.Installed ||
-                            !status.ExperimentalProfile)
-                        {
-                            return OptimizationActionResult.Unsupported(
-                                OperationCode.UnsupportedCapability,
-                                "MacBook Eco has not verified an installed, "
-                                    + "app-owned experimental 48 Hz override "
-                                    + "for this panel.");
-                        }
-
-                        profile = ResolveInstalledProfile(
-                            status.ProfileId,
-                            coreHardware,
-                            status.SourceEdidSignature);
-                        if (profile == null || !profile.IsExperimental ||
-                            !profile.Match(coreHardware).HardwareSupported)
-                        {
-                            return OptimizationActionResult.Unsupported(
-                                OperationCode.UnsupportedCapability,
-                                "The installed experimental 48 Hz profile no "
-                                    + "longer matches this Mac, panel and "
-                                    + "controlling adapter.");
-                        }
-
-                        if (coreHardware.NormalizedSourceEdidSignature == null &&
-                            (hardware.InternalDisplay.Edid == null ||
-                             hardware.InternalDisplay.Edid.Length !=
-                                EdidBaseBlock.Length ||
-                             status.OwnedOverrideHash == null ||
-                             !Sha256Digest.Compute(
-                                coreHardware.Edid.ToByteArray()).Equals(
-                                    status.OwnedOverrideHash)))
-                        {
-                            return OptimizationActionResult.Unsupported(
-                                OperationCode.UnsupportedCapability,
-                                "The experimental source EDID identity cannot "
-                                    + "be re-proven for this panel.");
-                        }
-
-                        if (!MatchesJournalTarget(
-                                displayTarget.Identity,
-                                status.TargetMonitorIdentity,
-                                status.OwnedOverrideHash))
-                        {
-                            return OptimizationActionResult.Unsupported(
-                                OperationCode.UnsupportedCapability,
-                                "The active internal panel is not the exact "
-                                    + "physical monitor recorded by the "
-                                    + "experimental display transaction.");
-                        }
-                    }
-
-                    if (!hardware.InternalDisplay
-                            .ExistingEdidOverrideReadSucceeded)
-                    {
-                        return OptimizationActionResult.Failed(
-                            OperationCode.ReadBackFailed,
-                            "The installed display override could not be read safely.",
-                            string.Empty);
+                        return OptimizationActionResult.Unsupported(
+                            OperationCode.UnsupportedCapability,
+                            "No reviewed 48 Hz profile matches this Mac and panel.");
                     }
 
                     byte[] currentOverride =
                         hardware.InternalDisplay.ExistingEdidOverride;
-                    byte[] expectedOverride = profile
-                        .CompileOverride(coreHardware.Edid)
+                    byte[] reviewedOverride = selection.Profile
+                        .BuildOverride(coreHardware)
                         .ToByteArray();
-                    if (!FixedTimeComparer.AreEqual(
-                            currentOverride,
-                            expectedOverride))
+                    if (!FixedTimeComparer.AreEqual(currentOverride, reviewedOverride))
                     {
                         return OptimizationActionResult.Unsupported(
                             OperationCode.UnsupportedCapability,
                             "The installed display override is absent or does not "
-                                + "match the exact app-owned 48 Hz profile.");
+                                + "match the reviewed 48 Hz profile.");
                     }
                 }
                 catch (Exception exception)
                 {
                     return OptimizationActionResult.Failed(
                         OperationCode.ReadBackFailed,
-                        "The app-owned 48 Hz profile could not be verified: "
+                        "The reviewed 48 Hz profile could not be verified: "
                             + exception.Message,
                         exception.Message);
                 }
             }
 
             return null;
-        }
-
-        private static DisplayProfile ResolveInstalledProfile(
-            string profileId,
-            HardwareSnapshot hardware,
-            Sha256Digest sourceEdidSignature)
-        {
-            DisplayProfile reviewed = ProfileCatalog.GetById(profileId);
-            if (reviewed != null)
-            {
-                return reviewed;
-            }
-
-            if (hardware == null || !string.Equals(
-                    hardware.SystemManufacturer,
-                    "Apple Inc.",
-                    StringComparison.Ordinal))
-            {
-                return null;
-            }
-
-            ExperimentalProfileGenerationResult generated =
-                Experimental48HzProfileGenerator.ResolveForRecovery(
-                    profileId,
-                    hardware.SystemModel,
-                    hardware.PanelHardwareId,
-                    hardware.Edid,
-                    sourceEdidSignature);
-            return generated.Succeeded ? generated.Profile : null;
-        }
-
-        internal static bool MatchesJournalTarget(
-            MonitorIdentity current,
-            MonitorIdentity journaled,
-            Sha256Digest ownedOverrideHash)
-        {
-            return current != null && journaled != null &&
-                ownedOverrideHash != null &&
-                string.Equals(
-                    current.MonitorInstanceId,
-                    journaled.MonitorInstanceId,
-                    StringComparison.Ordinal) &&
-                string.Equals(
-                    current.PanelHardwareId,
-                    journaled.PanelHardwareId,
-                    StringComparison.Ordinal) &&
-                string.Equals(
-                    current.ManufacturerCode,
-                    journaled.ManufacturerCode,
-                    StringComparison.Ordinal) &&
-                (current.EdidFingerprint.Equals(journaled.EdidFingerprint) ||
-                    current.EdidFingerprint.Equals(ownedOverrideHash));
         }
 
         public StableDisplayTarget ResolveActive(MonitorIdentity identity)
@@ -251,8 +136,6 @@ namespace MacBookEco.App
             WindowsMonitorInfo monitor)
         {
             if (target == null || target.Identity == null || monitor == null ||
-                target.Endpoint == null || monitor.Endpoint == null ||
-                !target.Endpoint.Equals(monitor.Endpoint) ||
                 string.IsNullOrWhiteSpace(monitor.DeviceInstanceId) ||
                 string.IsNullOrWhiteSpace(monitor.HardwareId))
             {
