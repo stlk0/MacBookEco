@@ -7,6 +7,15 @@ display mode and reversible CPU power presets.
 It is a native WinForms application for .NET Framework 4.8. It has no service,
 kernel driver, bundled runtime, analytics, or network access.
 
+## Download
+
+Download the installer from
+[GitHub Releases](https://github.com/stlk0/MacBookEco/releases).
+
+MacBook Eco is currently an unsigned alpha. Before installing, check the
+[supported hardware](SUPPORTED_HARDWARE.md) and
+[recovery guide](docs/RECOVERY.md).
+
 ## Status and support
 
 `0.1.1-alpha` is an unsigned prototype tested on one configuration:
@@ -37,7 +46,9 @@ driver.
 
 ## Install and use
 
-1. Run `MacBookEco-<version>-win-x64-setup.exe` and launch MacBook Eco.
+1. Download `MacBookEco-<version>-win-x64-setup.exe` from
+   [GitHub Releases](https://github.com/stlk0/MacBookEco/releases), run it, and
+   launch MacBook Eco.
 2. On the supported machine, select **Install 48 Hz support**, approve UAC, and
    restart Windows.
 3. Select **48 Hz**. Confirm the mode after checking the picture; otherwise the
