@@ -25,3 +25,7 @@ CPU presets are currently enabled only for SMBIOS `Apple Inc.` /
 
 On other hardware, MacBook Eco may show discovery information and read-only
 telemetry, but it will not install or generate a display timing.
+
+Profile files are contribution inputs, not runtime extensions. A new profile is
+available to users only after its evidence is reviewed and it is compiled into a
+new MacBook Eco build. See [display profile authoring](profiles/README.md).

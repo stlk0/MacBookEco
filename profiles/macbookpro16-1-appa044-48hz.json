@@ -1,0 +1,14 @@
+{
+  "id": "macbookpro16-1-appa044-48hz",
+  "displayName": "MacBook Pro 16-inch 2019 / APPA044",
+  "systemModels": [
+    "MacBookPro16,1"
+  ],
+  "panelHardwareId": "APPA044",
+  "normalizedEdidSignature": "CDA0E18080DE8CAC744C66A5374A53CBBA1999115FA5FE2DBD949980649AF3F5",
+  "nativeTiming": "E7 91 00 50 C0 80 37 70 08 20 98 08 59 D7 10 00 00 1A",
+  "targetTiming": "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A",
+  "verifiedGpuName": "AMD Radeon Pro 5300M",
+  "verifiedGpuDeviceIdPrefix": "PCI\\VEN_1002&DEV_7340",
+  "verifiedDriverVersion": "30.0.13045.22003"
+}

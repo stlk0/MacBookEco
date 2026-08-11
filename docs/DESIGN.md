@@ -44,6 +44,13 @@ A reviewed display profile contains the exact model, panel, original EDID,
 native timing, GPU device, and added timing. Installation proceeds only when
 those values match and the target override location is free.
 
+The review source is a small JSON manifest under `profiles/`. The build checks
+it and compiles a generated C# catalog into both unelevated and elevated
+executables. Neither executable reads profile files or calculates unknown
+timings at runtime, so a writable file cannot become an input to privileged
+display mutation. The offline authoring workflow is documented in
+[`profiles/README.md`](../profiles/README.md).
+
 The helper records the expected owned bytes before writing them, then verifies
 the registry value byte-for-byte. Removal deletes only that exact owned value.
 A foreign or changed value is left untouched.

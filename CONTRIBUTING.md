@@ -30,10 +30,13 @@ They are not implied by the host-safe test command.
 
 ## Display profiles
 
-Do not submit a calculated timing without evidence from the actual machine. Use
-the [display profile issue](.github/ISSUE_TEMPLATE/display-profile.yml), which
+Do not submit a calculated timing without evidence from the actual machine.
+Use the offline proposal utility and reviewed-manifest workflow documented in
+[`profiles/README.md`](profiles/README.md), then use the
+[display profile issue](.github/ISSUE_TEMPLATE/display-profile.yml), which
 requests the model, panel, original and candidate timings, GPU/driver, rollback,
-removal, cold-boot, and telemetry evidence.
+removal, cold-boot, and telemetry evidence. The installed application never
+loads profile files or calculates a fallback timing.
 
 Never commit serial numbers, device-instance suffixes, battery reports, registry
 exports, acceptance evidence, or private machine logs.

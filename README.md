@@ -104,6 +104,10 @@ The SDK is a development dependency only. Shipped binaries still target x64 and
 use the installed .NET Framework 4.8; they do not bundle or require the .NET
 SDK.
 
+Display profiles are reviewed as JSON manifests and compiled into the
+application; they are never loaded from disk at runtime. See
+[`profiles/README.md`](profiles/README.md) for the offline proposal workflow.
+
 ## Downloads and bug reports
 
 Published installers and source archives are available from
@@ -134,6 +138,7 @@ release as signed without verifying its Authenticode signatures.
 ## Documentation
 
 - [Supported hardware](SUPPORTED_HARDWARE.md)
+- [Display profile authoring](profiles/README.md)
 - [Recovery](docs/RECOVERY.md)
 - [Design and safety model](https://github.com/stlk0/MacBookEco/blob/main/docs/DESIGN.md)
 - [Code signing policy](docs/CODE_SIGNING.md)

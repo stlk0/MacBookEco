@@ -52,4 +52,3 @@ foreach ($forbidden in @(
 }
 
 Write-Host 'Hardware acceptance harness audit passed.'
-

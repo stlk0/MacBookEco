@@ -74,6 +74,11 @@ try {
         -Name 'SDK build, package integrity, and host-safe behavior' `
         -ScriptPath (Join-Path $projectRoot 'build\build.ps1')
     Invoke-RequiredSuite `
+        -Name 'offline display profile authoring behavior' `
+        -ScriptPath (Join-Path `
+            $projectRoot `
+            'tests\ProfileAuthoring\verify.ps1')
+    Invoke-RequiredSuite `
         -Name 'native ownership and durable-ordering audit' `
         -ScriptPath (Join-Path $projectRoot 'tests\Security\VerifyProductionBoundary.ps1')
     Invoke-RequiredSuite `
