@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 using MacBookEco.AppPolicy;
+using MacBookEco.Core;
 using MacBookEco.Platform.Windows;
 using MacBookEco.Telemetry;
 

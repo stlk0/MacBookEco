@@ -12,6 +12,7 @@ namespace MacBookEco.App
         private readonly TelemetryService _telemetry;
         private readonly OptimizationStateMonitor _stateMonitor;
         private readonly OptimizationCommandRunner _runner;
+        private readonly string _profileDiagnostics;
 
         private DashboardOverviewPage _overviewPage;
         private DashboardProfilesPage _profilesPage;
@@ -56,6 +57,7 @@ namespace MacBookEco.App
             _telemetry = telemetry;
             _stateMonitor = stateMonitor;
             _runner = runner;
+            _profileDiagnostics = profileDiagnostics;
             _latestSnapshot = TelemetrySnapshot.Empty();
             _lastActionResult = startupRecovery;
 
@@ -263,7 +265,7 @@ namespace MacBookEco.App
             _profilesTab.Controls.Add(_profilesPage.View);
             _diagnosticsPage = new DashboardDiagnosticsPage(
                 ReportActionStatus,
-                profileDiagnostics);
+                _profileDiagnostics);
             _diagnosticsTab.Controls.Add(_diagnosticsPage.View);
             _tabs.TabPages.Add(_overviewTab);
             _tabs.TabPages.Add(_profilesTab);
