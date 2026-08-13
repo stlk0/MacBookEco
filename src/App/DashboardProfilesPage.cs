@@ -270,6 +270,7 @@ namespace MacBookEco.App
         {
             Panel surface = CreateSurface(new Padding(18));
             surface.Margin = new Padding(4, 8, 4, 4);
+            surface.MinimumSize = new Size(0, 320);
 
             TableLayoutPanel outer = new TableLayoutPanel();
             outer.Dock = DockStyle.Fill;

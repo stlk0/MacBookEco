@@ -25,6 +25,7 @@ namespace MacBookEco.App
             ForeColor = DashboardTheme.PrimaryTextColor;
             Font = DashboardTheme.BodyFont;
             Padding = new Padding(14, 10, 14, 10);
+            MinimumSize = new Size(0, 230);
             AccessibleRole = AccessibleRole.Grouping;
             AccessibleName = "Selected CPU preset details";
 

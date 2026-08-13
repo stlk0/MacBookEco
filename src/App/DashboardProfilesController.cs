@@ -481,6 +481,7 @@ namespace MacBookEco.App
 
             if (!previousActive.HasValue || previousActive.Value != active)
             {
+                Size minimumSize = button.MinimumSize;
                 if (active)
                 {
                     DashboardTheme.StylePrimaryButton(button);
@@ -490,11 +491,11 @@ namespace MacBookEco.App
                     DashboardTheme.StyleSecondaryButton(button);
                 }
 
-                // StyleButtonBase intentionally supplies flexible defaults.
-                // These mode buttons are fixed-width only once on an actual
-                // state change, never again on an unchanged telemetry tick.
-                button.AutoSize = false;
-                button.Size = new Size(170, DashboardTheme.StandardControlHeight);
+                // The button may already have been DPI-scaled when telemetry
+                // changes its palette. Restyling must not replace that scaled
+                // minimum with the theme's unscaled design-time default.
+                button.MinimumSize = minimumSize;
+                button.AutoSize = true;
                 previousActive = active;
             }
 

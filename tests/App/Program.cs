@@ -162,14 +162,35 @@ namespace MacBookEco.Tests.App
                 profiles.View.PerformLayout();
                 overview.View.PerformLayout();
 
+                System.Drawing.Size displayMinimum =
+                    profiles.Display60Button.MinimumSize;
+                DashboardProfilesController controller =
+                    new DashboardProfilesController(customProfileItem);
+                controller.Attach(profiles);
+                controller.UpdateDisplay(new DisplayTelemetry(
+                    TelemetryAvailability.Available,
+                    "DISPLAY1",
+                    3072,
+                    1920,
+                    60.0,
+                    string.Empty));
+
                 Check.That(
                     profiles.Display48Button.Height
                         >= profiles.Display48Button.PreferredSize.Height,
                     "the refresh-rate row clipped a scaled button vertically");
                 Check.That(
+                    profiles.Display60Button.AutoSize
+                        && profiles.Display60Button.MinimumSize == displayMinimum,
+                    "an active display button lost its DPI-scaled minimum");
+                Check.That(
                     profiles.CpuRestoreButton.Width
                         >= profiles.CpuRestoreButton.PreferredSize.Width,
                     "the CPU choices column clipped its longest scaled button");
+                Check.That(
+                    profiles.CpuDetails.Height
+                        >= profiles.CpuDetails.MinimumSize.Height,
+                    "the CPU details panel clipped its scaled policy rows");
 
                 int metricCardCount = 0;
                 foreach (MetricCard card in FindControls<MetricCard>(overview.View))
