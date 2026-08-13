@@ -21,7 +21,7 @@ Once stable public releases exist, only the latest signed stable release will
 receive security fixes. Development and alpha builds are intended for local
 testing on explicitly supported hardware.
 
-`0.1.2-alpha` is not Authenticode-signed, so Windows may show SmartScreen or UAC
+`0.1.3-alpha` is not Authenticode-signed, so Windows may show SmartScreen or UAC
 warnings. Do not work around them by adding antivirus exclusions.
 
 See [the design and safety model](docs/DESIGN.md) for the privilege and recovery
