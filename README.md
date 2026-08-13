@@ -18,7 +18,7 @@ MacBook Eco is currently an unsigned alpha. Before installing, check the
 
 ## Status and support
 
-`0.1.2-alpha` is an unsigned prototype tested on one configuration:
+`0.1.3-alpha` is an unsigned prototype tested on one configuration:
 
 - MacBook Pro 16-inch, 2019 (`MacBookPro16,1`);
 - internal panel `APPA044`;
