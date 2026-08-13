@@ -188,6 +188,14 @@ namespace MacBookEco.Tests.App
                         >= profiles.CpuRestoreButton.PreferredSize.Width,
                     "the CPU choices column clipped its longest scaled button");
                 Check.That(
+                    profiles.RecommendedProfile.Right
+                        <= profiles.RecommendedProfile.Parent.ClientSize.Width,
+                    "the combined-profile selector escaped its scaled cell");
+                Check.That(
+                    profiles.CpuPreset.Right
+                        <= profiles.CpuPreset.Parent.ClientSize.Width,
+                    "the CPU selector escaped its scaled cell");
+                Check.That(
                     profiles.CpuDetails.Height
                         >= profiles.CpuDetails.MinimumSize.Height,
                     "the CPU details panel clipped its scaled policy rows");

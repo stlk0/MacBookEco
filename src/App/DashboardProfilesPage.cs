@@ -287,7 +287,7 @@ namespace MacBookEco.App
             content.Dock = DockStyle.Fill;
             content.ColumnCount = 2;
             content.RowCount = 1;
-            content.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 285.0f));
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100.0f));
 
             TableLayoutPanel choices = new TableLayoutPanel();
@@ -396,7 +396,7 @@ namespace MacBookEco.App
         private static ComboBox CreateComboBox()
         {
             ComboBox combo = new ComboBox();
-            combo.Dock = DockStyle.Fill;
+            combo.Anchor = AnchorStyles.Left | AnchorStyles.Right;
             combo.DropDownStyle = ComboBoxStyle.DropDownList;
             combo.FlatStyle = FlatStyle.Standard;
             combo.Font = DashboardTheme.BodyFont;

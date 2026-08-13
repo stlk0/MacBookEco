@@ -46,12 +46,9 @@ namespace MacBookEco.App
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
 
             _description = DashboardTheme.CreateBodyLabel(string.Empty);
-            _description.AutoSize = false;
-            _description.Dock = DockStyle.Fill;
+            _description.AutoSize = true;
+            _description.Anchor = AnchorStyles.Left;
             _description.TextAlign = ContentAlignment.MiddleLeft;
-            _description.MinimumSize = new Size(
-                0,
-                _description.Font.Height + 6);
             layout.Controls.Add(_description, 0, 0);
             layout.SetColumnSpan(_description, 3);
 
@@ -67,8 +64,8 @@ namespace MacBookEco.App
             Label note = DashboardTheme.CreateCaptionLabel(
                 "0 = performance, 100 = efficiency. Applied to the app-owned "
                     + "MacBook Eco plan; Restore returns the prior Windows plan.");
-            note.AutoSize = false;
-            note.Dock = DockStyle.Fill;
+            note.AutoSize = true;
+            note.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
             note.TextAlign = ContentAlignment.BottomLeft;
             note.Margin = new Padding(0, 4, 0, 0);
             layout.Controls.Add(note, 0, 7);
@@ -102,14 +99,15 @@ namespace MacBookEco.App
         private void AddHeader(TableLayoutPanel layout, string text, int column)
         {
             Label label = DashboardTheme.CreateCaptionLabel(text);
-            label.AutoSize = false;
-            label.Dock = DockStyle.Fill;
+            label.AutoSize = true;
+            label.Anchor = column == 0
+                ? AnchorStyles.Left
+                : AnchorStyles.Right;
             label.TextAlign = column == 0
                 ? ContentAlignment.MiddleLeft
                 : ContentAlignment.MiddleRight;
             label.Font = DashboardTheme.CaptionStrongFont;
             label.Margin = Padding.Empty;
-            label.MinimumSize = new Size(0, label.Font.Height + 4);
             layout.Controls.Add(label, column, 1);
         }
 
@@ -120,12 +118,11 @@ namespace MacBookEco.App
             string setting)
         {
             Label label = DashboardTheme.CreateCaptionLabel(setting);
-            label.AutoSize = false;
-            label.Dock = DockStyle.Fill;
+            label.AutoSize = true;
+            label.Anchor = AnchorStyles.Left;
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.ForeColor = DashboardTheme.PrimaryTextColor;
             label.Margin = Padding.Empty;
-            label.MinimumSize = new Size(0, label.Font.Height + 4);
             layout.Controls.Add(label, 0, row);
 
             _pluggedIn[index] = CreateValueLabel();
@@ -137,12 +134,11 @@ namespace MacBookEco.App
         private static Label CreateValueLabel()
         {
             Label label = DashboardTheme.CreateCaptionLabel(string.Empty);
-            label.AutoSize = false;
-            label.Dock = DockStyle.Fill;
+            label.AutoSize = true;
+            label.Anchor = AnchorStyles.Right;
             label.TextAlign = ContentAlignment.MiddleRight;
             label.ForeColor = DashboardTheme.PrimaryTextColor;
             label.Margin = Padding.Empty;
-            label.MinimumSize = new Size(0, label.Font.Height + 4);
             return label;
         }
 
