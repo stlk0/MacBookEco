@@ -128,6 +128,7 @@ finally {
 }
 
 $applicationOutput = Join-Path $outputDirectory "MacBookEco.exe"
+$applicationConfigOutput = Join-Path $outputDirectory "MacBookEco.exe.config"
 $adminOutput = Join-Path $outputDirectory "MacBookEco.Admin.exe"
 $watchdogOutput = Join-Path $outputDirectory "MacBookEco.Watchdog.exe"
 $packagingTestOutput =
@@ -138,6 +139,7 @@ $appTestOutput = Join-Path $outputDirectory "MacBookEco.AppTests.exe"
 
 foreach ($requiredOutput in @(
         $applicationOutput,
+        $applicationConfigOutput,
         $adminOutput,
         $watchdogOutput,
         $packagingTestOutput,

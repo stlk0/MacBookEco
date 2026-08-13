@@ -83,11 +83,12 @@ namespace MacBookEco.App
             TableLayoutPanel root = new TableLayoutPanel();
             root.Dock = DockStyle.Fill;
             root.BackColor = DashboardTheme.CanvasColor;
+            root.AutoScroll = true;
             root.ColumnCount = 2;
             root.RowCount = 2;
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 46.0f));
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 54.0f));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 284.0f));
+            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
 
             root.Controls.Add(BuildRecommendedProfiles(), 0, 0);
@@ -102,19 +103,18 @@ namespace MacBookEco.App
         {
             Panel surface = CreateSurface(new Padding(18));
             surface.Margin = new Padding(4, 4, 8, 8);
+            surface.AutoSize = true;
+            surface.AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Fill;
+            layout.AutoSize = true;
             layout.ColumnCount = 1;
             layout.RowCount = 8;
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 18.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 20.0f));
+            for (int row = 0; row < layout.RowCount; row++)
+            {
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            }
 
             layout.Controls.Add(
                 DashboardTheme.CreateSectionTitle("Combined profiles"), 0, 0);
@@ -188,17 +188,20 @@ namespace MacBookEco.App
         {
             Panel surface = CreateSurface(new Padding(18));
             surface.Margin = new Padding(8, 4, 4, 8);
+            surface.AutoSize = true;
+            surface.AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Fill;
+            layout.AutoSize = true;
             layout.ColumnCount = 1;
             layout.RowCount = 6;
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 1.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 72.0f));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             layout.Controls.Add(DashboardTheme.CreateSectionTitle("Display"), 0, 0);
             DisplayCurrent = DashboardTheme.CreateBodyLabel(
@@ -233,8 +236,8 @@ namespace MacBookEco.App
             support.RowCount = 2;
             support.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100.0f));
             support.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            support.RowStyles.Add(new RowStyle(SizeType.Absolute, 22.0f));
-            support.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
+            support.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            support.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             Label supportTitle = DashboardTheme.CreateCaptionLabel("48 Hz mode setup");
             supportTitle.Font = DashboardTheme.CaptionStrongFont;
@@ -272,8 +275,8 @@ namespace MacBookEco.App
             outer.Dock = DockStyle.Fill;
             outer.ColumnCount = 1;
             outer.RowCount = 3;
-            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 30.0f));
-            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 28.0f));
+            outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
             outer.Controls.Add(DashboardTheme.CreateSectionTitle("CPU power plan"), 0, 0);
             CpuState = DashboardTheme.CreateCaptionLabel("Current plan: checking...");
@@ -291,11 +294,11 @@ namespace MacBookEco.App
             choices.Padding = new Padding(0, 6, 16, 0);
             choices.ColumnCount = 1;
             choices.RowCount = 6;
-            choices.RowStyles.Add(new RowStyle(SizeType.Absolute, 18.0f));
-            choices.RowStyles.Add(new RowStyle(SizeType.Absolute, 36.0f));
-            choices.RowStyles.Add(new RowStyle(SizeType.Absolute, 44.0f));
-            choices.RowStyles.Add(new RowStyle(SizeType.Absolute, 14.0f));
-            choices.RowStyles.Add(new RowStyle(SizeType.Absolute, 44.0f));
+            choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             choices.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
 
             Label chooseCpu = DashboardTheme.CreateCaptionLabel("CPU preset to apply");
@@ -376,8 +379,12 @@ namespace MacBookEco.App
 
         private static void ConfigureDisplayModeButton(Button button)
         {
-            button.AutoSize = false;
-            button.Size = new Size(170, DashboardTheme.StandardControlHeight);
+            button.AutoSize = true;
+            button.MinimumSize = new Size(
+                170,
+                Math.Max(
+                    DashboardTheme.StandardControlHeight,
+                    button.Font.Height + 12));
             button.Margin = new Padding(0, 3, 10, 3);
         }
 
@@ -390,7 +397,7 @@ namespace MacBookEco.App
             combo.Font = DashboardTheme.BodyFont;
             combo.FormattingEnabled = true;
             combo.DrawMode = DrawMode.OwnerDrawFixed;
-            combo.ItemHeight = 28;
+            combo.ItemHeight = Math.Max(28, combo.Font.Height + 8);
             combo.MaxDropDownItems = 8;
             combo.BackColor = Color.White;
             combo.ForeColor = DashboardTheme.PrimaryTextColor;
@@ -438,6 +445,7 @@ namespace MacBookEco.App
             label.Dock = DockStyle.Fill;
             label.AutoEllipsis = true;
             label.TextAlign = ContentAlignment.TopLeft;
+            label.MinimumSize = new Size(0, (label.Font.Height * 2) + 4);
             return label;
         }
     }

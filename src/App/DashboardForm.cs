@@ -3,16 +3,13 @@ using System.Drawing;
 using System.Windows.Forms;
 using MacBookEco.AppPolicy;
 using MacBookEco.Core;
+using MacBookEco.Platform.Windows;
 using MacBookEco.Telemetry;
 
 namespace MacBookEco.App
 {
     public sealed class DashboardForm : Form
     {
-        // One row of content plus breathing room. The header previously spent
-        // 78px restating the window caption and a tagline.
-        private const float HeaderHeight = 46.0f;
-
         private readonly TelemetryService _telemetry;
         private readonly OptimizationStateMonitor _stateMonitor;
         private readonly OptimizationCommandRunner _runner;
@@ -75,7 +72,7 @@ namespace MacBookEco.App
             root.RowCount = 3;
             root.BackColor = DashboardTheme.CanvasColor;
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100.0f));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, HeaderHeight));
+            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52.0f));
 
@@ -155,15 +152,19 @@ namespace MacBookEco.App
             Panel header = new Panel();
             header.Dock = DockStyle.Fill;
             header.BackColor = DashboardTheme.SurfaceColor;
-            header.Padding = new Padding(22, 0, 22, 0);
+            header.Padding = new Padding(22, 8, 22, 8);
+            header.AutoSize = true;
+            header.AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Fill;
+            layout.AutoSize = true;
+            layout.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             layout.ColumnCount = 2;
             layout.RowCount = 1;
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100.0f));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             Label title = DashboardTheme.CreatePageTitle(Application.ProductName);
             title.AutoSize = true;
@@ -260,12 +261,75 @@ namespace MacBookEco.App
                 ApplyRecommendedProfile);
             _profilesController.Attach(_profilesPage);
             _profilesTab.Controls.Add(_profilesPage.View);
-            _diagnosticsPage = new DashboardDiagnosticsPage(ReportActionStatus);
+            _diagnosticsPage = new DashboardDiagnosticsPage(
+                ReportActionStatus,
+                CaptureProfileDiagnostics());
             _diagnosticsTab.Controls.Add(_diagnosticsPage.View);
             _tabs.TabPages.Add(_overviewTab);
             _tabs.TabPages.Add(_profilesTab);
             _tabs.TabPages.Add(_diagnosticsTab);
             return _tabs;
+        }
+
+        private static string CaptureProfileDiagnostics()
+        {
+            try
+            {
+                WindowsHardwareSnapshot snapshot =
+                    new HardwareDiscoveryService().Discover();
+                if (snapshot == null)
+                {
+                    return BuildProfileDiscoveryFailure(
+                        "Hardware discovery returned no result.");
+                }
+
+                if (snapshot.InternalDisplay == null)
+                {
+                    return BuildProfileDiscoveryFailure(
+                        "The active internal panel could not be resolved.");
+                }
+
+                if (string.IsNullOrWhiteSpace(snapshot.AppleModel))
+                {
+                    return BuildProfileDiscoveryFailure(
+                        "The SMBIOS model is unavailable.");
+                }
+
+                if (string.IsNullOrWhiteSpace(
+                    snapshot.InternalDisplay.HardwareId))
+                {
+                    return BuildProfileDiscoveryFailure(
+                        "The panel hardware identifier is unavailable.");
+                }
+
+                if (snapshot.InternalDisplay.Edid == null)
+                {
+                    return BuildProfileDiscoveryFailure(
+                        "The base EDID is unavailable.");
+                }
+
+                return ProfileCatalog.BuildPublicDiagnostics(
+                    snapshot.ToCoreSnapshot());
+            }
+            catch
+            {
+                // Discovery failures stay categorical. Exception messages can
+                // contain device-instance paths and do not belong in a report
+                // explicitly intended for public sharing.
+                return BuildProfileDiscoveryFailure(
+                    "The discovered hardware data could not be validated.");
+            }
+        }
+
+        private static string BuildProfileDiscoveryFailure(string reason)
+        {
+            return "Display profile compatibility (public-safe)"
+                + Environment.NewLine
+                + "Discovery: Incomplete"
+                + Environment.NewLine
+                + "Mismatch: "
+                + reason
+                + Environment.NewLine;
         }
 
         private static TabPage CreateTab(string text)

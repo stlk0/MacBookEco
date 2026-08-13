@@ -35,11 +35,11 @@ namespace MacBookEco.App
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48.0f));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 26.0f));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 26.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24.0f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22.0f));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             for (int row = 0; row < 5; row++)
             {
-                layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 23.0f));
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             }
 
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
@@ -48,6 +48,9 @@ namespace MacBookEco.App
             _description.AutoSize = false;
             _description.Dock = DockStyle.Fill;
             _description.TextAlign = ContentAlignment.MiddleLeft;
+            _description.MinimumSize = new Size(
+                0,
+                _description.Font.Height + 6);
             layout.Controls.Add(_description, 0, 0);
             layout.SetColumnSpan(_description, 3);
 
@@ -105,6 +108,7 @@ namespace MacBookEco.App
                 : ContentAlignment.MiddleRight;
             label.Font = DashboardTheme.CaptionStrongFont;
             label.Margin = Padding.Empty;
+            label.MinimumSize = new Size(0, label.Font.Height + 4);
             layout.Controls.Add(label, column, 1);
         }
 
@@ -120,6 +124,7 @@ namespace MacBookEco.App
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.ForeColor = DashboardTheme.PrimaryTextColor;
             label.Margin = Padding.Empty;
+            label.MinimumSize = new Size(0, label.Font.Height + 4);
             layout.Controls.Add(label, 0, row);
 
             _pluggedIn[index] = CreateValueLabel();
@@ -136,6 +141,7 @@ namespace MacBookEco.App
             label.TextAlign = ContentAlignment.MiddleRight;
             label.ForeColor = DashboardTheme.PrimaryTextColor;
             label.Margin = Padding.Empty;
+            label.MinimumSize = new Size(0, label.Font.Height + 4);
             return label;
         }
 

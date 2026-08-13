@@ -20,6 +20,19 @@ namespace MacBookEco.Tests.Core
             "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 10 " +
             "00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 BC";
 
+        // Second reviewed APPA044 base-block variant. Per-unit bytes 12-17
+        // are cleared and its checksum is recomputed. The only normalized
+        // difference from the first fixture is byte 26 (A1 instead of B1).
+        private const string ReviewedAppa044Faf4Edid =
+            "00 FF FF FF FF FF FF 00 06 10 44 A0 00 00 00 00 " +
+            "00 00 01 04 B5 22 16 78 02 0F A1 AE 52 43 B0 26 " +
+            "0D 50 54 00 00 00 01 01 01 01 01 01 01 01 01 01 " +
+            "01 01 01 01 01 01 E7 91 00 50 C0 80 37 70 08 20 " +
+            "98 08 59 D7 10 00 00 1A 00 00 00 FC 00 43 6F 6C " +
+            "6F 72 20 4C 43 44 0A 20 20 20 00 00 00 10 00 00 " +
+            "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 10 " +
+            "00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 CC";
+
         private const string Exact48Dtd =
             "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A";
 
@@ -36,6 +49,9 @@ namespace MacBookEco.Tests.Core
                     "Normalized signature is stable after managed insertion",
                     NormalizedSignature),
                 Test("Known hardware selects the reviewed profile", KnownProfileMatches),
+                Test(
+                    "Alternate APPA044 EDID selects its exact profile",
+                    AlternateAppa044ProfileMatches),
                 Test("Unknown hardware and unknown layout are rejected", UnknownProfileRejected),
                 Test("Occupied descriptor layout refuses insertion", OccupiedLayoutRejected),
                 Test("Hardware support is distinct from install readiness", CapabilitySplit),
@@ -222,6 +238,28 @@ namespace MacBookEco.Tests.Core
             var warningMatch = selected.Profile.Match(otherDriver);
             Check.True(warningMatch.HardwareSupported);
             Check.Equal(1, warningMatch.Warnings.Count);
+        }
+
+        private static void AlternateAppa044ProfileMatches()
+        {
+            EdidBaseBlock edid =
+                EdidBaseBlock.ParseHex(ReviewedAppa044Faf4Edid);
+            HardwareSnapshot hardware = CreateKnownHardware(edid);
+            ProfileSelectionResult selected = ProfileCatalog.Select(hardware);
+
+            Check.True(selected.HardwareSupported);
+            Check.NotNull(selected.Profile);
+            Check.Equal(
+                ProfileCatalog.MacBookPro161Appa044Faf4ProfileId,
+                selected.Profile.Id);
+            Check.Equal(
+                Sha256Digest.ParseCanonical(
+                    "FAF4A9C16A6B394896D75DAA3280D84"
+                    + "A61744EA07ED2F7CC21E6CFBCF1B4D2DF"),
+                edid.NormalizedSignature);
+            Check.True(
+                selected.Profile.BuildOverride(hardware)
+                    .ContainsDetailedTiming(selected.Profile.TargetTiming));
         }
 
         private static void UnknownProfileRejected()
