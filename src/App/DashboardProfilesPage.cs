@@ -111,6 +111,8 @@ namespace MacBookEco.App
             layout.AutoSize = true;
             layout.ColumnCount = 1;
             layout.RowCount = 8;
+            layout.ColumnStyles.Add(
+                new ColumnStyle(SizeType.Percent, 100.0f));
             for (int row = 0; row < layout.RowCount; row++)
             {
                 layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -196,6 +198,8 @@ namespace MacBookEco.App
             layout.AutoSize = true;
             layout.ColumnCount = 1;
             layout.RowCount = 6;
+            layout.ColumnStyles.Add(
+                new ColumnStyle(SizeType.Percent, 100.0f));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -270,12 +274,13 @@ namespace MacBookEco.App
         {
             Panel surface = CreateSurface(new Padding(18));
             surface.Margin = new Padding(4, 8, 4, 4);
-            surface.MinimumSize = new Size(0, 320);
 
             TableLayoutPanel outer = new TableLayoutPanel();
             outer.Dock = DockStyle.Fill;
             outer.ColumnCount = 1;
             outer.RowCount = 3;
+            outer.ColumnStyles.Add(
+                new ColumnStyle(SizeType.Percent, 100.0f));
             outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
@@ -297,6 +302,8 @@ namespace MacBookEco.App
             choices.Padding = new Padding(0, 6, 16, 0);
             choices.ColumnCount = 1;
             choices.RowCount = 6;
+            choices.ColumnStyles.Add(
+                new ColumnStyle(SizeType.Percent, 100.0f));
             choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));

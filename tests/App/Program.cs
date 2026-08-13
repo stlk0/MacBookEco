@@ -195,11 +195,26 @@ namespace MacBookEco.Tests.App
                     profiles.CpuPreset.Right
                         <= profiles.CpuPreset.Parent.ClientSize.Width,
                     "the CPU selector escaped its scaled cell");
-                Check.That(
-                    profiles.CpuDetails.Height
-                        >= profiles.CpuDetails.MinimumSize.Height,
-                    "the CPU details panel clipped its scaled policy rows");
 
+                bool foundCpuNote = false;
+                foreach (Label label in FindControls<Label>(profiles.CpuDetails))
+                {
+                    if (!label.Text.StartsWith(
+                        "0 = performance",
+                        StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    foundCpuNote = true;
+                    Check.That(
+                        label.Parent.Bottom
+                            <= profiles.CpuDetails.ClientSize.Height,
+                        "the scaled CPU policy note was clipped");
+                }
+
+                Check.That(foundCpuNote,
+                    "the CPU policy note was missing from the preview");
                 int metricCardCount = 0;
                 foreach (MetricCard card in FindControls<MetricCard>(overview.View))
                 {

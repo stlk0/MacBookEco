@@ -25,12 +25,13 @@ namespace MacBookEco.App
             ForeColor = DashboardTheme.PrimaryTextColor;
             Font = DashboardTheme.BodyFont;
             Padding = new Padding(14, 10, 14, 10);
-            MinimumSize = new Size(0, 230);
             AccessibleRole = AccessibleRole.Grouping;
             AccessibleName = "Selected CPU preset details";
 
             TableLayoutPanel layout = new TableLayoutPanel();
-            layout.Dock = DockStyle.Fill;
+            layout.Dock = DockStyle.Top;
+            layout.AutoSize = true;
+            layout.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             layout.ColumnCount = 3;
             layout.RowCount = 8;
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48.0f));
@@ -43,7 +44,7 @@ namespace MacBookEco.App
                 layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             }
 
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             _description = DashboardTheme.CreateBodyLabel(string.Empty);
             _description.AutoSize = true;
@@ -65,7 +66,7 @@ namespace MacBookEco.App
                 "0 = performance, 100 = efficiency. Applied to the app-owned "
                     + "MacBook Eco plan; Restore returns the prior Windows plan.");
             note.AutoSize = true;
-            note.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
+            note.Anchor = AnchorStyles.Left;
             note.TextAlign = ContentAlignment.BottomLeft;
             note.Margin = new Padding(0, 4, 0, 0);
             layout.Controls.Add(note, 0, 7);
@@ -107,7 +108,7 @@ namespace MacBookEco.App
                 ? ContentAlignment.MiddleLeft
                 : ContentAlignment.MiddleRight;
             label.Font = DashboardTheme.CaptionStrongFont;
-            label.Margin = Padding.Empty;
+            label.Margin = new Padding(0, 1, 0, 1);
             layout.Controls.Add(label, column, 1);
         }
 
@@ -122,7 +123,7 @@ namespace MacBookEco.App
             label.Anchor = AnchorStyles.Left;
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.ForeColor = DashboardTheme.PrimaryTextColor;
-            label.Margin = Padding.Empty;
+            label.Margin = new Padding(0, 1, 0, 1);
             layout.Controls.Add(label, 0, row);
 
             _pluggedIn[index] = CreateValueLabel();
@@ -138,7 +139,7 @@ namespace MacBookEco.App
             label.Anchor = AnchorStyles.Right;
             label.TextAlign = ContentAlignment.MiddleRight;
             label.ForeColor = DashboardTheme.PrimaryTextColor;
-            label.Margin = Padding.Empty;
+            label.Margin = new Padding(0, 1, 0, 1);
             return label;
         }
 
