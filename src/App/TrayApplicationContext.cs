@@ -42,7 +42,8 @@ namespace MacBookEco.App
             TelemetryService telemetry,
             IOptimizationActionService actions,
             bool showDashboardAtStartup,
-            OptimizationActionResult startupRecovery)
+            OptimizationActionResult startupRecovery,
+            string profileDiagnostics)
         {
             if (telemetry == null)
             {
@@ -83,7 +84,8 @@ namespace MacBookEco.App
                 _telemetry,
                 _stateMonitor,
                 _runner,
-                startupRecovery);
+                startupRecovery,
+                profileDiagnostics);
             _menu = new ContextMenuStrip();
 
             ToolStripMenuItem openItem = new ToolStripMenuItem("Open dashboard");

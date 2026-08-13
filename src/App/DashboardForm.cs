@@ -3,7 +3,6 @@ using System.Drawing;
 using System.Windows.Forms;
 using MacBookEco.AppPolicy;
 using MacBookEco.Core;
-using MacBookEco.Platform.Windows;
 using MacBookEco.Telemetry;
 
 namespace MacBookEco.App
@@ -36,7 +35,8 @@ namespace MacBookEco.App
             TelemetryService telemetry,
             OptimizationStateMonitor stateMonitor,
             OptimizationCommandRunner runner,
-            OptimizationActionResult startupRecovery)
+            OptimizationActionResult startupRecovery,
+            string profileDiagnostics)
         {
             if (telemetry == null)
             {
@@ -263,73 +263,12 @@ namespace MacBookEco.App
             _profilesTab.Controls.Add(_profilesPage.View);
             _diagnosticsPage = new DashboardDiagnosticsPage(
                 ReportActionStatus,
-                CaptureProfileDiagnostics());
+                profileDiagnostics);
             _diagnosticsTab.Controls.Add(_diagnosticsPage.View);
             _tabs.TabPages.Add(_overviewTab);
             _tabs.TabPages.Add(_profilesTab);
             _tabs.TabPages.Add(_diagnosticsTab);
             return _tabs;
-        }
-
-        private static string CaptureProfileDiagnostics()
-        {
-            try
-            {
-                WindowsHardwareSnapshot snapshot =
-                    new HardwareDiscoveryService().Discover();
-                if (snapshot == null)
-                {
-                    return BuildProfileDiscoveryFailure(
-                        "Hardware discovery returned no result.");
-                }
-
-                if (snapshot.InternalDisplay == null)
-                {
-                    return BuildProfileDiscoveryFailure(
-                        "The active internal panel could not be resolved.");
-                }
-
-                if (string.IsNullOrWhiteSpace(snapshot.AppleModel))
-                {
-                    return BuildProfileDiscoveryFailure(
-                        "The SMBIOS model is unavailable.");
-                }
-
-                if (string.IsNullOrWhiteSpace(
-                    snapshot.InternalDisplay.HardwareId))
-                {
-                    return BuildProfileDiscoveryFailure(
-                        "The panel hardware identifier is unavailable.");
-                }
-
-                if (snapshot.InternalDisplay.Edid == null)
-                {
-                    return BuildProfileDiscoveryFailure(
-                        "The base EDID is unavailable.");
-                }
-
-                return ProfileCatalog.BuildPublicDiagnostics(
-                    snapshot.ToCoreSnapshot());
-            }
-            catch
-            {
-                // Discovery failures stay categorical. Exception messages can
-                // contain device-instance paths and do not belong in a report
-                // explicitly intended for public sharing.
-                return BuildProfileDiscoveryFailure(
-                    "The discovered hardware data could not be validated.");
-            }
-        }
-
-        private static string BuildProfileDiscoveryFailure(string reason)
-        {
-            return "Display profile compatibility (public-safe)"
-                + Environment.NewLine
-                + "Discovery: Incomplete"
-                + Environment.NewLine
-                + "Mismatch: "
-                + reason
-                + Environment.NewLine;
         }
 
         private static TabPage CreateTab(string text)

@@ -78,7 +78,8 @@ namespace MacBookEco.App
                             telemetry,
                             actions,
                             !startHidden,
-                            startupRecovery));
+                            startupRecovery,
+                            CaptureProfileDiagnostics()));
                     return 0;
                 }
                 finally
@@ -213,6 +214,67 @@ namespace MacBookEco.App
                 default:
                     return UninstallSafetyState.Unknown;
             }
+        }
+
+        private static string CaptureProfileDiagnostics()
+        {
+            try
+            {
+                WindowsHardwareSnapshot snapshot =
+                    new HardwareDiscoveryService().Discover();
+                if (snapshot == null)
+                {
+                    return BuildProfileDiscoveryFailure(
+                        "Hardware discovery returned no result.");
+                }
+
+                if (snapshot.InternalDisplay == null)
+                {
+                    return BuildProfileDiscoveryFailure(
+                        "The active internal panel could not be resolved.");
+                }
+
+                if (string.IsNullOrWhiteSpace(snapshot.AppleModel))
+                {
+                    return BuildProfileDiscoveryFailure(
+                        "The SMBIOS model is unavailable.");
+                }
+
+                if (string.IsNullOrWhiteSpace(
+                    snapshot.InternalDisplay.HardwareId))
+                {
+                    return BuildProfileDiscoveryFailure(
+                        "The panel hardware identifier is unavailable.");
+                }
+
+                if (snapshot.InternalDisplay.Edid == null)
+                {
+                    return BuildProfileDiscoveryFailure(
+                        "The base EDID is unavailable.");
+                }
+
+                return ProfileCatalog.BuildPublicDiagnostics(
+                    snapshot.ToCoreSnapshot());
+            }
+            catch
+            {
+                // Discovery failures stay categorical. Exception messages can
+                // contain device-instance paths and do not belong in a report
+                // explicitly intended for public sharing.
+                return BuildProfileDiscoveryFailure(
+                    "The discovered hardware data could not be validated.");
+            }
+        }
+
+        private static string BuildProfileDiscoveryFailure(string reason)
+        {
+            return "Display profile compatibility (public-safe)"
+                + Environment.NewLine
+                + "Discovery: Incomplete"
+                + Environment.NewLine
+                + "Mismatch: "
+                + reason
+                + Environment.NewLine;
         }
 
         private static IOptimizationActionService CreateActions(
