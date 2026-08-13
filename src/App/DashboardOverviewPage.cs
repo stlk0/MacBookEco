@@ -75,11 +75,13 @@ namespace MacBookEco.App
             root.ColumnCount = 1;
             root.RowCount = 2;
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100.0f));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 118.0f));
+            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
 
             TableLayoutPanel metrics = new TableLayoutPanel();
             metrics.Dock = DockStyle.Fill;
+            metrics.AutoSize = true;
+            metrics.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             metrics.ColumnCount = 4;
             metrics.RowCount = 1;
             for (int index = 0; index < 4; index++)

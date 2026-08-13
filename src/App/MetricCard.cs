@@ -36,8 +36,8 @@ namespace MacBookEco.App
             BackColor = Color.Transparent;
             ForeColor = DashboardTheme.PrimaryTextColor;
             Font = DashboardTheme.BodyFont;
-            MinimumSize = new Size(160, 90);
-            Size = new Size(220, 105);
+            MinimumSize = new Size(160, 112);
+            Size = new Size(220, 112);
             TabStop = false;
             AccessibleRole = AccessibleRole.Grouping;
             UpdateAccessibilityText();

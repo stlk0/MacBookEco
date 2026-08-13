@@ -286,11 +286,13 @@ namespace MacBookEco.App
             content.Dock = DockStyle.Fill;
             content.ColumnCount = 2;
             content.RowCount = 1;
-            content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 285.0f));
+            content.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100.0f));
 
             TableLayoutPanel choices = new TableLayoutPanel();
             choices.Dock = DockStyle.Fill;
+            choices.AutoSize = true;
+            choices.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             choices.Padding = new Padding(0, 6, 16, 0);
             choices.ColumnCount = 1;
             choices.RowCount = 6;
@@ -370,7 +372,9 @@ namespace MacBookEco.App
         private static FlowLayoutPanel CreateButtonRow()
         {
             FlowLayoutPanel panel = new FlowLayoutPanel();
-            panel.Dock = DockStyle.Fill;
+            panel.AutoSize = true;
+            panel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            panel.Anchor = AnchorStyles.Left;
             panel.FlowDirection = FlowDirection.LeftToRight;
             panel.WrapContents = false;
             panel.Padding = new Padding(0, 2, 0, 0);

@@ -76,7 +76,7 @@ namespace MacBookEco.App
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100.0f));
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52.0f));
+            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             root.Controls.Add(BuildHeader(), 0, 0);
             root.Controls.Add(BuildTabs(), 0, 1);
@@ -285,12 +285,14 @@ namespace MacBookEco.App
         {
             _actionPanel = new Panel();
             _actionPanel.Dock = DockStyle.Fill;
+            _actionPanel.AutoSize = true;
+            _actionPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             _actionPanel.BackColor = DashboardTheme.MutedSurfaceColor;
             _actionPanel.Padding = new Padding(20, 11, 20, 8);
             _actionStatus = DashboardTheme.CreateBodyLabel(
                 "Monitoring is active. No setting changes without an explicit click.");
-            _actionStatus.Dock = DockStyle.Fill;
-            _actionStatus.AutoSize = false;
+            _actionStatus.Dock = DockStyle.Top;
+            _actionStatus.AutoSize = true;
             _actionStatus.AutoEllipsis = true;
             _actionStatus.TextAlign = ContentAlignment.MiddleLeft;
             _actionPanel.Controls.Add(_actionStatus);

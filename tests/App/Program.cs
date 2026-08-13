@@ -37,6 +37,8 @@ namespace MacBookEco.Tests.App
                     TestMetricCardPresentationMapsStatusAndAccessibility),
                 Test("Dashboard forms retain their 96 DPI design baseline",
                     TestDashboardThemeUses96DpiBaseline),
+                Test("Dashboard content keeps its preferred size after scaling",
+                    TestDashboardContentKeepsPreferredSizeAfterScaling),
                 Test("Display confirmation countdown honors its deadline",
                     TestDisplayConfirmationCountdownBoundary),
                 Test("Display support UI exposes only safe actions",
@@ -133,6 +135,76 @@ namespace MacBookEco.Tests.App
                         && Math.Abs(
                             form.AutoScaleDimensions.Height - 96.0f) < 0.001f,
                     "dashboard forms must record their 96 DPI design baseline");
+            }
+        }
+
+        private static void TestDashboardContentKeepsPreferredSizeAfterScaling()
+        {
+            object customProfileItem = new object();
+            DashboardProfilesPage profiles = new DashboardProfilesPage(
+                customProfileItem,
+                delegate { },
+                delegate { },
+                delegate { },
+                delegate { },
+                delegate { },
+                delegate { },
+                delegate { },
+                delegate { },
+                delegate { });
+            DashboardOverviewPage overview = new DashboardOverviewPage();
+            try
+            {
+                profiles.View.Size = new System.Drawing.Size(1180, 700);
+                overview.View.Size = new System.Drawing.Size(1180, 700);
+                profiles.View.Scale(new System.Drawing.SizeF(2.0f, 2.0f));
+                overview.View.Scale(new System.Drawing.SizeF(2.0f, 2.0f));
+                profiles.View.PerformLayout();
+                overview.View.PerformLayout();
+
+                Check.That(
+                    profiles.Display48Button.Height
+                        >= profiles.Display48Button.PreferredSize.Height,
+                    "the refresh-rate row clipped a scaled button vertically");
+                Check.That(
+                    profiles.CpuRestoreButton.Width
+                        >= profiles.CpuRestoreButton.PreferredSize.Width,
+                    "the CPU choices column clipped its longest scaled button");
+
+                int metricCardCount = 0;
+                foreach (MetricCard card in FindControls<MetricCard>(overview.View))
+                {
+                    metricCardCount++;
+                    Check.That(
+                        card.Height >= card.MinimumSize.Height,
+                        "the metric row clipped a scaled metric card");
+                }
+
+                Check.That(metricCardCount == 4,
+                    "the overview must retain all four metric cards");
+            }
+            finally
+            {
+                profiles.View.Dispose();
+                overview.View.Dispose();
+            }
+        }
+
+        private static IEnumerable<TControl> FindControls<TControl>(Control root)
+            where TControl : Control
+        {
+            foreach (Control child in root.Controls)
+            {
+                TControl match = child as TControl;
+                if (match != null)
+                {
+                    yield return match;
+                }
+
+                foreach (TControl descendant in FindControls<TControl>(child))
+                {
+                    yield return descendant;
+                }
             }
         }
 
