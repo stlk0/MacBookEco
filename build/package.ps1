@@ -123,10 +123,11 @@ $requiredBinaries = @(
     "MacBookEco.Admin.exe",
     "MacBookEco.Watchdog.exe"
 )
-foreach ($binary in $requiredBinaries) {
-    $source = Join-Path $outputDirectory $binary
+$requiredPayloadFiles = @($requiredBinaries) + "MacBookEco.exe.config"
+foreach ($payloadFile in $requiredPayloadFiles) {
+    $source = Join-Path $outputDirectory $payloadFile
     if (-not (Test-Path -LiteralPath $source)) {
-        throw "Required release binary was not found: $source"
+        throw "Required release payload was not found: $source"
     }
 
     Copy-Item -LiteralPath $source -Destination $stagingDirectory
@@ -168,11 +169,11 @@ foreach ($document in @(
 }
 
 $hashLines = New-Object System.Collections.Generic.List[string]
-foreach ($binary in $requiredBinaries) {
+foreach ($payloadFile in $requiredPayloadFiles) {
     $hash = Get-FileHash `
-        -LiteralPath (Join-Path $stagingDirectory $binary) `
+        -LiteralPath (Join-Path $stagingDirectory $payloadFile) `
         -Algorithm SHA256
-    $hashLines.Add($hash.Hash.ToLowerInvariant() + "  " + $binary)
+    $hashLines.Add($hash.Hash.ToLowerInvariant() + "  " + $payloadFile)
 }
 Set-Content `
     -LiteralPath (Join-Path $stagingDirectory "SHA256SUMS.txt") `

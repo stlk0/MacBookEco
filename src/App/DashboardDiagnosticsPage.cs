@@ -17,10 +17,13 @@ namespace MacBookEco.App
     internal sealed class DashboardDiagnosticsPage
     {
         private readonly Action<string> _reportStatus;
+        private readonly string _profileDiagnostics;
         private readonly TextBox _diagnostics;
         private readonly Control _view;
 
-        public DashboardDiagnosticsPage(Action<string> reportStatus)
+        public DashboardDiagnosticsPage(
+            Action<string> reportStatus,
+            string profileDiagnostics)
         {
             if (reportStatus == null)
             {
@@ -28,6 +31,12 @@ namespace MacBookEco.App
             }
 
             _reportStatus = reportStatus;
+            _profileDiagnostics = string.IsNullOrWhiteSpace(profileDiagnostics)
+                ? "Display profile compatibility (public-safe)"
+                    + Environment.NewLine
+                    + "Discovery: Unavailable"
+                    + Environment.NewLine
+                : profileDiagnostics;
             _diagnostics = CreateTextBox();
             _view = BuildView();
         }
@@ -47,7 +56,8 @@ namespace MacBookEco.App
             string diagnostics = BuildPublicDiagnostics(
                 snapshot,
                 optimizationState,
-                lastActionResult);
+                lastActionResult,
+                _profileDiagnostics);
             if (string.Equals(
                 _diagnostics.Text,
                 diagnostics,
@@ -66,7 +76,8 @@ namespace MacBookEco.App
         internal static string BuildPublicDiagnostics(
             TelemetrySnapshot snapshot,
             OptimizationStateSnapshot optimizationState,
-            OptimizationActionResult lastActionResult)
+            OptimizationActionResult lastActionResult,
+            string profileDiagnostics)
         {
             if (snapshot == null)
             {
@@ -75,6 +86,21 @@ namespace MacBookEco.App
 
             StringBuilder text = new StringBuilder();
             text.Append(TelemetryText.BuildPublicDiagnostics(snapshot));
+            text.AppendLine();
+            string compatibility = string.IsNullOrWhiteSpace(profileDiagnostics)
+                ? "Display profile compatibility (public-safe)"
+                    + Environment.NewLine
+                    + "Discovery: Unavailable"
+                    + Environment.NewLine
+                : profileDiagnostics;
+            text.Append(compatibility);
+            if (!compatibility.EndsWith(
+                Environment.NewLine,
+                StringComparison.Ordinal))
+            {
+                text.AppendLine();
+            }
+
             text.AppendLine();
             text.AppendLine("Optimization state (read-only)");
             if (optimizationState == null)

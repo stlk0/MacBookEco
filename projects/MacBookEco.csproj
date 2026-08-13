@@ -6,6 +6,7 @@
     <OutputPath>..\build\out\</OutputPath>
     <UseWindowsForms>true</UseWindowsForms>
     <StartupObject>MacBookEco.App.Program</StartupObject>
+    <AppConfig>..\src\App\app.config</AppConfig>
     <ApplicationManifest>..\src\App\app.manifest</ApplicationManifest>
     <ApplicationIcon>..\src\App\MacBookEco.ico</ApplicationIcon>
   </PropertyGroup>

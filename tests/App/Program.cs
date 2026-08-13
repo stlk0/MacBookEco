@@ -177,7 +177,9 @@ namespace MacBookEco.Tests.App
             string report = DashboardDiagnosticsPage.BuildPublicDiagnostics(
                 snapshot,
                 state,
-                action);
+                action,
+                ProfileCatalog.BuildPublicDiagnostics(
+                    CreatePublicDiagnosticsHardware()));
 
             Check.That(
                 report.IndexOf(PrivateMarker, StringComparison.Ordinal) < 0,
@@ -195,6 +197,44 @@ namespace MacBookEco.Tests.App
             Check.That(
                 !report.Contains("Message:") && !report.Contains("Detail:"),
                 "public diagnostics exposed free-form action fields");
+            Check.That(
+                report.Contains(
+                    "Mismatch: The normalized EDID signature does not match."),
+                "public diagnostics omitted the stable profile mismatch");
+            Check.That(
+                report.Contains(
+                    "Native DTD: E7910050C08037700820980859D71000001A"),
+                "public diagnostics omitted the profile-authoring timing");
+            Check.That(
+                report.Contains("GPU device: PCI\\VEN_1002&DEV_7340"),
+                "public diagnostics omitted the redacted GPU identity");
+            Check.That(
+                !report.Contains("SUBSYS") && !report.Contains("SERIAL"),
+                "public diagnostics exposed a machine-specific identifier");
+        }
+
+        private static HardwareSnapshot CreatePublicDiagnosticsHardware()
+        {
+            byte[] edid = HexCodec.Parse(
+                "00 FF FF FF FF FF FF 00 06 10 44 A0 00 00 00 00 "
+                + "00 00 01 04 B5 22 16 78 02 0F B1 AE 52 43 B0 26 "
+                + "0D 50 54 00 00 00 01 01 01 01 01 01 01 01 01 01 "
+                + "01 01 01 01 01 01 E7 91 00 50 C0 80 37 70 08 20 "
+                + "98 08 59 D7 10 00 00 1A 00 00 00 FC 00 43 6F 6C "
+                + "6F 72 20 4C 43 44 0A 20 20 20 00 00 00 10 00 00 "
+                + "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 10 "
+                + "00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 BC");
+            edid[24] ^= 0x01;
+            EdidBaseBlock.UpdateChecksum(edid);
+            return new HardwareSnapshot(
+                "Apple Inc.",
+                "MacBookPro16,1",
+                true,
+                "DISPLAY\\APPA044\\PRIVATE",
+                new EdidBaseBlock(edid),
+                "AMD Radeon Pro 5300M",
+                "PCI\\VEN_1002&DEV_7340&SUBSYS_PRIVATE\\SERIAL",
+                "31.0.0.0");
         }
 
         private static void TestStartupCommandUsesBackgroundMode()
