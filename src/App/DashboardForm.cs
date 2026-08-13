@@ -61,12 +61,12 @@ namespace MacBookEco.App
             _latestSnapshot = TelemetrySnapshot.Empty();
             _lastActionResult = startupRecovery;
 
+            SuspendLayout();
             Text = Application.ProductName;
             Icon = ApplicationIcon.Shared;
             StartPosition = FormStartPosition.CenterScreen;
             MinimumSize = new Size(980, 700);
             ClientSize = new Size(1180, 790);
-            DashboardTheme.StyleForm(this);
 
             TableLayoutPanel root = new TableLayoutPanel();
             root.Dock = DockStyle.Fill;
@@ -82,6 +82,10 @@ namespace MacBookEco.App
             root.Controls.Add(BuildTabs(), 0, 1);
             root.Controls.Add(BuildActionPanel(), 0, 2);
             Controls.Add(root);
+            // Setting AutoScaleMode schedules scaling for controls that already
+            // belong to the form. Keep this after the complete tree is built.
+            DashboardTheme.StyleForm(this);
+            ResumeLayout(true);
 
             _telemetry.SnapshotAvailable += OnSnapshotAvailable;
             _stateMonitor.Changed += OnOptimizationStateChanged;

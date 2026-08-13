@@ -28,6 +28,7 @@ namespace MacBookEco.App
             _timer.Interval = 100;
             _timer.Tick += OnTimerTick;
 
+            SuspendLayout();
             Text = "Confirm display mode";
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -36,7 +37,6 @@ namespace MacBookEco.App
             ShowInTaskbar = false;
             ClientSize = new Size(470, 244);
             Padding = new Padding(20);
-            DashboardTheme.StyleForm(this);
 
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Fill;
@@ -95,6 +95,9 @@ namespace MacBookEco.App
             layout.Controls.Add(_countdown, 0, 2);
             layout.Controls.Add(actions, 0, 3);
             Controls.Add(layout);
+            // Scale the complete dialog tree, not only the form bounds.
+            DashboardTheme.StyleForm(this);
+            ResumeLayout(true);
 
             AcceptButton = _keepButton;
             CancelButton = revertButton;
