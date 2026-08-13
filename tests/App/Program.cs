@@ -35,6 +35,8 @@ namespace MacBookEco.Tests.App
                     TestTimeSeriesAxisRangeIsFiniteAndHonorsBounds),
                 Test("Metric-card status and accessibility stay consistent",
                     TestMetricCardPresentationMapsStatusAndAccessibility),
+                Test("Dashboard forms retain their 96 DPI design baseline",
+                    TestDashboardThemeUses96DpiBaseline),
                 Test("Display confirmation countdown honors its deadline",
                     TestDisplayConfirmationCountdownBoundary),
                 Test("Display support UI exposes only safe actions",
@@ -115,6 +117,23 @@ namespace MacBookEco.Tests.App
         private static TestCase Test(string name, Action body)
         {
             return new TestCase(name, body);
+        }
+
+        private static void TestDashboardThemeUses96DpiBaseline()
+        {
+            using (Form form = new Form())
+            {
+                DashboardTheme.StyleForm(form);
+
+                Check.That(
+                    form.AutoScaleMode == AutoScaleMode.Dpi,
+                    "dashboard forms must scale from DPI rather than font metrics");
+                Check.That(
+                    Math.Abs(form.AutoScaleDimensions.Width - 96.0f) < 0.001f
+                        && Math.Abs(
+                            form.AutoScaleDimensions.Height - 96.0f) < 0.001f,
+                    "dashboard forms must record their 96 DPI design baseline");
+            }
         }
 
         private static void TestPublicDiagnosticsOmitPrivateData()

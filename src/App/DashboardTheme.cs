@@ -10,6 +10,8 @@ namespace MacBookEco.App
     /// </summary>
     public static class DashboardTheme
     {
+        private const float DesignDpi = 96.0f;
+
         public static readonly Color CanvasColor = Color.FromArgb(244, 247, 248);
         public static readonly Color SurfaceColor = Color.FromArgb(255, 255, 255);
         public static readonly Color MutedSurfaceColor = Color.FromArgb(237, 242, 244);
@@ -83,6 +85,7 @@ namespace MacBookEco.App
             form.BackColor = CanvasColor;
             form.ForeColor = PrimaryTextColor;
             form.Font = BodyFont;
+            form.AutoScaleDimensions = new SizeF(DesignDpi, DesignDpi);
             form.AutoScaleMode = AutoScaleMode.Dpi;
         }
 
