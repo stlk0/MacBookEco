@@ -107,10 +107,12 @@ namespace MacBookEco.App
             surface.AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
             TableLayoutPanel layout = new TableLayoutPanel();
-            layout.Dock = DockStyle.Fill;
+            layout.Dock = DockStyle.Top;
             layout.AutoSize = true;
             layout.ColumnCount = 1;
             layout.RowCount = 8;
+            layout.ColumnStyles.Add(
+                new ColumnStyle(SizeType.Percent, 100.0f));
             for (int row = 0; row < layout.RowCount; row++)
             {
                 layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -192,10 +194,12 @@ namespace MacBookEco.App
             surface.AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
             TableLayoutPanel layout = new TableLayoutPanel();
-            layout.Dock = DockStyle.Fill;
+            layout.Dock = DockStyle.Top;
             layout.AutoSize = true;
             layout.ColumnCount = 1;
             layout.RowCount = 6;
+            layout.ColumnStyles.Add(
+                new ColumnStyle(SizeType.Percent, 100.0f));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -275,6 +279,8 @@ namespace MacBookEco.App
             outer.Dock = DockStyle.Fill;
             outer.ColumnCount = 1;
             outer.RowCount = 3;
+            outer.ColumnStyles.Add(
+                new ColumnStyle(SizeType.Percent, 100.0f));
             outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
@@ -291,9 +297,13 @@ namespace MacBookEco.App
 
             TableLayoutPanel choices = new TableLayoutPanel();
             choices.Dock = DockStyle.Fill;
+            choices.AutoSize = true;
+            choices.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             choices.Padding = new Padding(0, 6, 16, 0);
             choices.ColumnCount = 1;
             choices.RowCount = 6;
+            choices.ColumnStyles.Add(
+                new ColumnStyle(SizeType.Percent, 100.0f));
             choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             choices.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -370,7 +380,9 @@ namespace MacBookEco.App
         private static FlowLayoutPanel CreateButtonRow()
         {
             FlowLayoutPanel panel = new FlowLayoutPanel();
-            panel.Dock = DockStyle.Fill;
+            panel.AutoSize = true;
+            panel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            panel.Anchor = AnchorStyles.Left;
             panel.FlowDirection = FlowDirection.LeftToRight;
             panel.WrapContents = false;
             panel.Padding = new Padding(0, 2, 0, 0);
@@ -391,7 +403,7 @@ namespace MacBookEco.App
         private static ComboBox CreateComboBox()
         {
             ComboBox combo = new ComboBox();
-            combo.Dock = DockStyle.Fill;
+            combo.Anchor = AnchorStyles.Left | AnchorStyles.Right;
             combo.DropDownStyle = ComboBoxStyle.DropDownList;
             combo.FlatStyle = FlatStyle.Standard;
             combo.Font = DashboardTheme.BodyFont;

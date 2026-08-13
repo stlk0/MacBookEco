@@ -35,6 +35,10 @@ namespace MacBookEco.Tests.App
                     TestTimeSeriesAxisRangeIsFiniteAndHonorsBounds),
                 Test("Metric-card status and accessibility stay consistent",
                     TestMetricCardPresentationMapsStatusAndAccessibility),
+                Test("Dashboard forms retain their 96 DPI design baseline",
+                    TestDashboardThemeUses96DpiBaseline),
+                Test("Dashboard content keeps its preferred size after scaling",
+                    TestDashboardContentKeepsPreferredSizeAfterScaling),
                 Test("Display confirmation countdown honors its deadline",
                     TestDisplayConfirmationCountdownBoundary),
                 Test("Display support UI exposes only safe actions",
@@ -115,6 +119,137 @@ namespace MacBookEco.Tests.App
         private static TestCase Test(string name, Action body)
         {
             return new TestCase(name, body);
+        }
+
+        private static void TestDashboardThemeUses96DpiBaseline()
+        {
+            using (Form form = new Form())
+            {
+                DashboardTheme.StyleForm(form);
+
+                Check.That(
+                    form.AutoScaleMode == AutoScaleMode.Dpi,
+                    "dashboard forms must scale from DPI rather than font metrics");
+                Check.That(
+                    Math.Abs(form.AutoScaleDimensions.Width - 96.0f) < 0.001f
+                        && Math.Abs(
+                            form.AutoScaleDimensions.Height - 96.0f) < 0.001f,
+                    "dashboard forms must record their 96 DPI design baseline");
+            }
+        }
+
+        private static void TestDashboardContentKeepsPreferredSizeAfterScaling()
+        {
+            object customProfileItem = new object();
+            DashboardProfilesPage profiles = new DashboardProfilesPage(
+                customProfileItem,
+                delegate { },
+                delegate { },
+                delegate { },
+                delegate { },
+                delegate { },
+                delegate { },
+                delegate { },
+                delegate { },
+                delegate { });
+            DashboardOverviewPage overview = new DashboardOverviewPage();
+            try
+            {
+                profiles.View.Size = new System.Drawing.Size(1180, 700);
+                overview.View.Size = new System.Drawing.Size(1180, 700);
+                profiles.View.Scale(new System.Drawing.SizeF(2.0f, 2.0f));
+                overview.View.Scale(new System.Drawing.SizeF(2.0f, 2.0f));
+                profiles.View.PerformLayout();
+                overview.View.PerformLayout();
+
+                System.Drawing.Size displayMinimum =
+                    profiles.Display60Button.MinimumSize;
+                DashboardProfilesController controller =
+                    new DashboardProfilesController(customProfileItem);
+                controller.Attach(profiles);
+                controller.UpdateDisplay(new DisplayTelemetry(
+                    TelemetryAvailability.Available,
+                    "DISPLAY1",
+                    3072,
+                    1920,
+                    60.0,
+                    string.Empty));
+
+                Check.That(
+                    profiles.Display48Button.Height
+                        >= profiles.Display48Button.PreferredSize.Height,
+                    "the refresh-rate row clipped a scaled button vertically");
+                Check.That(
+                    profiles.Display60Button.AutoSize
+                        && profiles.Display60Button.MinimumSize == displayMinimum,
+                    "an active display button lost its DPI-scaled minimum");
+                Check.That(
+                    profiles.CpuRestoreButton.Width
+                        >= profiles.CpuRestoreButton.PreferredSize.Width,
+                    "the CPU choices column clipped its longest scaled button");
+                Check.That(
+                    profiles.RecommendedProfile.Right
+                        <= profiles.RecommendedProfile.Parent.ClientSize.Width,
+                    "the combined-profile selector escaped its scaled cell");
+                Check.That(
+                    profiles.CpuPreset.Right
+                        <= profiles.CpuPreset.Parent.ClientSize.Width,
+                    "the CPU selector escaped its scaled cell");
+
+                bool foundCpuNote = false;
+                foreach (Label label in FindControls<Label>(profiles.CpuDetails))
+                {
+                    if (!label.Text.StartsWith(
+                        "0 = performance",
+                        StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    foundCpuNote = true;
+                    Check.That(
+                        label.Parent.Bottom
+                            <= profiles.CpuDetails.ClientSize.Height,
+                        "the scaled CPU policy note was clipped");
+                }
+
+                Check.That(foundCpuNote,
+                    "the CPU policy note was missing from the preview");
+                int metricCardCount = 0;
+                foreach (MetricCard card in FindControls<MetricCard>(overview.View))
+                {
+                    metricCardCount++;
+                    Check.That(
+                        card.Height >= card.MinimumSize.Height,
+                        "the metric row clipped a scaled metric card");
+                }
+
+                Check.That(metricCardCount == 4,
+                    "the overview must retain all four metric cards");
+            }
+            finally
+            {
+                profiles.View.Dispose();
+                overview.View.Dispose();
+            }
+        }
+
+        private static IEnumerable<TControl> FindControls<TControl>(Control root)
+            where TControl : Control
+        {
+            foreach (Control child in root.Controls)
+            {
+                TControl match = child as TControl;
+                if (match != null)
+                {
+                    yield return match;
+                }
+
+                foreach (TControl descendant in FindControls<TControl>(child))
+                {
+                    yield return descendant;
+                }
+            }
         }
 
         private static void TestPublicDiagnosticsOmitPrivateData()
