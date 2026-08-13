@@ -107,7 +107,7 @@ namespace MacBookEco.App
             surface.AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
             TableLayoutPanel layout = new TableLayoutPanel();
-            layout.Dock = DockStyle.Fill;
+            layout.Dock = DockStyle.Top;
             layout.AutoSize = true;
             layout.ColumnCount = 1;
             layout.RowCount = 8;
@@ -192,7 +192,7 @@ namespace MacBookEco.App
             surface.AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
             TableLayoutPanel layout = new TableLayoutPanel();
-            layout.Dock = DockStyle.Fill;
+            layout.Dock = DockStyle.Top;
             layout.AutoSize = true;
             layout.ColumnCount = 1;
             layout.RowCount = 6;
