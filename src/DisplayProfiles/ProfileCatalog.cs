@@ -14,6 +14,9 @@ namespace MacBookEco.Core
         public const string MacBookPro161Appa044Faf4ProfileId =
             "macbookpro16-1-appa044-faf4a9c1-48hz";
 
+        public const string MacBookPro161Appa0444b2eProfileId =
+            "macbookpro16-1-appa044-4b2ea063-48hz";
+
         private static readonly ReadOnlyCollection<DisplayProfile> Profiles =
             Array.AsReadOnly(
                 new[]
@@ -22,12 +25,20 @@ namespace MacBookEco.Core
                         MacBookPro161Appa044ProfileId,
                         "MacBook Pro 16-inch 2019 / APPA044",
                         "CDA0E18080DE8CAC744C66A5374A53CBBA1999115FA5FE2DBD949980649AF3F5",
+                        "AMD Radeon Pro 5300M",
                         "30.0.13045.22003"),
                     CreateAppa044Profile(
                         MacBookPro161Appa044Faf4ProfileId,
                         "MacBook Pro 16-inch 2019 / APPA044 FAF4A9C1",
                         "FAF4A9C16A6B394896D75DAA3280D84A61744EA07ED2F7CC21E6CFBCF1B4D2DF",
-                        string.Empty)
+                        "AMD Radeon Pro 5300M",
+                        string.Empty),
+                    CreateAppa044Profile(
+                        MacBookPro161Appa0444b2eProfileId,
+                        "MacBook Pro 16-inch 2019 / APPA044 4B2EA063",
+                        "4B2EA0633F9C80C074E8F06E891B5F179444E0A417CD60AFBD190C732840B7EC",
+                        "AMD Radeon Pro 5500M",
+                        "26.20.13003.5002")
                 });
 
         public static ReadOnlyCollection<DisplayProfile> All => Profiles;
@@ -36,6 +47,7 @@ namespace MacBookEco.Core
             string id,
             string displayName,
             string normalizedEdidSignature,
+            string verifiedGpuName,
             string verifiedDriverVersion)
         {
             return new DisplayProfile(
@@ -48,7 +60,7 @@ namespace MacBookEco.Core
                     "E7 91 00 50 C0 80 37 70 08 20 98 08 59 D7 10 00 00 1A"),
                 DetailedTiming.ParseHex(
                     "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A"),
-                "AMD Radeon Pro 5300M",
+                verifiedGpuName,
                 "PCI\\VEN_1002&DEV_7340",
                 verifiedDriverVersion);
         }
@@ -137,6 +149,9 @@ namespace MacBookEco.Core
             text.AppendLine(
                 "Normalized EDID signature: "
                 + hardware.NormalizedEdidSignature);
+            text.AppendLine(
+                "Sanitized EDID profile fixture: "
+                + HexCodec.Format(hardware.Edid.ToPublicProfileFixture()));
             text.AppendLine(
                 "Native DTD: "
                 + HexCodec.Format(hardware.NativeTiming.ToByteArray()));

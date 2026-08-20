@@ -309,12 +309,14 @@ namespace MacBookEco.Tests.App
                 PrivateMarker,
                 PrivateMarker);
 
+            HardwareSnapshot hardware = CreatePublicDiagnosticsHardware();
+            string profileDiagnostics =
+                ProfileCatalog.BuildPublicDiagnostics(hardware);
             string report = DashboardDiagnosticsPage.BuildPublicDiagnostics(
                 snapshot,
                 state,
                 action,
-                ProfileCatalog.BuildPublicDiagnostics(
-                    CreatePublicDiagnosticsHardware()));
+                profileDiagnostics);
 
             Check.That(
                 report.IndexOf(PrivateMarker, StringComparison.Ordinal) < 0,
@@ -340,6 +342,11 @@ namespace MacBookEco.Tests.App
                 report.Contains(
                     "Native DTD: E7910050C08037700820980859D71000001A"),
                 "public diagnostics omitted the profile-authoring timing");
+            Check.That(
+                report.Contains(
+                    "Sanitized EDID profile fixture: "
+                    + HexCodec.Format(hardware.Edid.ToPublicProfileFixture())),
+                "public diagnostics omitted the sanitized profile fixture");
             Check.That(
                 report.Contains("GPU device: PCI\\VEN_1002&DEV_7340"),
                 "public diagnostics omitted the redacted GPU identity");

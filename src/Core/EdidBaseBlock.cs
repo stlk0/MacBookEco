@@ -105,6 +105,14 @@ namespace MacBookEco.Core
             return (byte[])_bytes.Clone();
         }
 
+        public byte[] ToPublicProfileFixture()
+        {
+            byte[] sanitized = ToByteArray();
+            ClearProfileVariantData(sanitized);
+            UpdateChecksum(sanitized);
+            return sanitized;
+        }
+
         public bool IsDetailedTimingDescriptor(int descriptorIndex)
         {
             var offset = GetDescriptorOffset(descriptorIndex);
@@ -267,11 +275,18 @@ namespace MacBookEco.Core
 
         private static Sha256Digest NormalizeAndHash(byte[] normalized)
         {
+            ClearProfileVariantData(normalized);
+            normalized[127] = 0;
+            return Sha256Digest.Compute(normalized);
+        }
+
+        private static void ClearProfileVariantData(byte[] value)
+        {
             // Serial number and manufacturing week/year vary between otherwise
             // identical panels and are not part of a reviewed timing profile.
             for (var index = 12; index <= 17; index++)
             {
-                normalized[index] = 0;
+                value[index] = 0;
             }
 
             // Only the preferred native DTD participates in the signature.
@@ -281,11 +296,8 @@ namespace MacBookEco.Core
                 index < 126;
                 index++)
             {
-                normalized[index] = 0;
+                value[index] = 0;
             }
-
-            normalized[127] = 0;
-            return Sha256Digest.Compute(normalized);
         }
 
         private static int GetDescriptorOffset(int descriptorIndex)

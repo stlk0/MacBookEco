@@ -33,10 +33,13 @@ They are not implied by the host-safe test command.
 Do not submit a calculated timing without evidence from the actual machine. Use
 the [display profile issue](.github/ISSUE_TEMPLATE/display-profile.yml), which
 requests the model, panel, original and candidate timings, GPU/driver, rollback,
-removal, cold-boot, and telemetry evidence.
+removal, cold-boot, and telemetry evidence. Paste the complete public-safe
+display diagnostics so the sanitized EDID profile fixture can reproduce the
+reported normalized signature in compiled tests.
 
 Never commit serial numbers, device-instance suffixes, battery reports, registry
-exports, acceptance evidence, or private machine logs.
+exports, raw EDID or DisplayID extension blocks, acceptance evidence, or private
+machine logs.
 
 ## Release and signing changes
 

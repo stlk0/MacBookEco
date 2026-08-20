@@ -33,6 +33,19 @@ namespace MacBookEco.Tests.Core
             "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 10 " +
             "00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 CC";
 
+        // Public APPA044 fixture for the Radeon Pro 5500M report in issue #8.
+        // Per-unit serial and manufacture bytes are cleared and the checksum
+        // is recomputed. The DisplayID extension is deliberately not retained.
+        private const string ReviewedAppa0444b2eEdid =
+            "00 FF FF FF FF FF FF 00 06 10 44 A0 00 00 00 00 " +
+            "00 00 01 04 B5 22 16 78 02 0F 81 AE 52 43 B0 26 " +
+            "0E 50 54 00 00 00 01 01 01 01 01 01 01 01 01 01 " +
+            "01 01 01 01 01 01 E7 91 00 50 C0 80 37 70 08 20 " +
+            "98 08 59 D7 10 00 00 1A 00 00 00 FC 00 43 6F 6C " +
+            "6F 72 20 4C 43 44 0A 20 20 20 00 00 00 10 00 00 " +
+            "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 10 " +
+            "00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 EB";
+
         private const string Exact48Dtd =
             "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A";
 
@@ -52,6 +65,9 @@ namespace MacBookEco.Tests.Core
                 Test(
                     "Alternate APPA044 EDID selects its exact profile",
                     AlternateAppa044ProfileMatches),
+                Test(
+                    "Radeon Pro 5500M APPA044 EDID selects its exact profile",
+                    Radeon5500Appa044ProfileMatches),
                 Test("Unknown hardware and unknown layout are rejected", UnknownProfileRejected),
                 Test("Occupied descriptor layout refuses insertion", OccupiedLayoutRejected),
                 Test("Hardware support is distinct from install readiness", CapabilitySplit),
@@ -184,6 +200,28 @@ namespace MacBookEco.Tests.Core
                     "CD:A0:E1:80:80:DE:8C:AC:74:4C:66:A5:37:4A:53:CB:"
                     + "BA:19:99:11:5F:A5:FE:2D:BD:94:99:80:64:9A:F3:F5"));
 
+            byte[] publicFixture = original.ToPublicProfileFixture();
+            Check.True(EdidBaseBlock.HasValidChecksum(publicFixture));
+            Check.BytesEqual(
+                original.PreferredTiming.ToByteArray(),
+                new EdidBaseBlock(publicFixture).PreferredTiming.ToByteArray());
+            Check.Equal(
+                original.NormalizedSignature,
+                new EdidBaseBlock(publicFixture).NormalizedSignature);
+            for (var index = 12; index <= 17; index++)
+            {
+                Check.Equal((byte)0, publicFixture[index]);
+            }
+
+            for (
+                var index = EdidBaseBlock.FirstDescriptorOffset
+                    + DetailedTiming.EncodedLength;
+                index < 126;
+                index++)
+            {
+                Check.Equal((byte)0, publicFixture[index]);
+            }
+
             byte[] anotherUnit = original.ToByteArray();
             anotherUnit[12] = 0x12;
             anotherUnit[13] = 0x34;
@@ -257,6 +295,38 @@ namespace MacBookEco.Tests.Core
                     "FAF4A9C16A6B394896D75DAA3280D84"
                     + "A61744EA07ED2F7CC21E6CFBCF1B4D2DF"),
                 edid.NormalizedSignature);
+            Check.True(
+                selected.Profile.BuildOverride(hardware)
+                    .ContainsDetailedTiming(selected.Profile.TargetTiming));
+        }
+
+        private static void Radeon5500Appa044ProfileMatches()
+        {
+            EdidBaseBlock edid =
+                EdidBaseBlock.ParseHex(ReviewedAppa0444b2eEdid);
+            HardwareSnapshot hardware = new HardwareSnapshot(
+                "Apple Inc.",
+                "MacBookPro16,1",
+                true,
+                "MONITOR\\APPA044\\REDACTED",
+                edid,
+                "AMD Radeon Pro 5500M",
+                "PCI\\VEN_1002&DEV_7340&SUBSYS_REDACTED",
+                "26.20.13003.5002");
+            ProfileSelectionResult selected = ProfileCatalog.Select(hardware);
+
+            Check.True(selected.HardwareSupported);
+            Check.NotNull(selected.Profile);
+            Check.Equal(
+                ProfileCatalog.MacBookPro161Appa0444b2eProfileId,
+                selected.Profile.Id);
+            Check.Equal(
+                Sha256Digest.ParseCanonical(
+                    "4B2EA0633F9C80C074E8F06E891B5F17"
+                    + "9444E0A417CD60AFBD190C732840B7EC"),
+                edid.NormalizedSignature);
+            Check.Equal(0, selected.ClosestMatch.RejectionReasons.Count);
+            Check.Equal(0, selected.ClosestMatch.Warnings.Count);
             Check.True(
                 selected.Profile.BuildOverride(hardware)
                     .ContainsDetailedTiming(selected.Profile.TargetTiming));
