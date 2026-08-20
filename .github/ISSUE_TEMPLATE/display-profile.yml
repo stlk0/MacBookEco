@@ -34,11 +34,23 @@ body:
       required: true
 
   - type: textarea
-    id: dtd
+    id: diagnostics
     attributes:
-      label: Native and candidate 48 Hz DTDs
-      description: Provide both as 18 hexadecimal bytes.
+      label: Public-safe display diagnostics
+      description: |
+        Paste the complete display profile compatibility report from MacBook
+        Eco. It includes a sanitized profile fixture and contains no raw EDID
+        or per-device serial number.
       render: text
+    validations:
+      required: true
+
+  - type: input
+    id: candidate-dtd
+    attributes:
+      label: Tested candidate 48 Hz DTD
+      description: Provide the exact 18 hexadecimal bytes tested on this machine.
+      placeholder: DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A
     validations:
       required: true
 
