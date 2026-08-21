@@ -18,11 +18,11 @@ MacBook Eco is currently an unsigned alpha. Before installing, check the
 
 ## Status and support
 
-`0.1.4-alpha` is an unsigned prototype tested on one configuration:
+Display support is available for reviewed exact profiles matching:
 
 - MacBook Pro 16-inch, 2019 (`MacBookPro16,1`);
 - internal panel `APPA044`;
-- AMD Radeon Pro 5300M.
+- AMD Radeon Pro 5300M or 5500M.
 
 Display changes require an exact hardware match. Other machines remain
 diagnostic-only. See [supported hardware](SUPPORTED_HARDWARE.md) for the full
