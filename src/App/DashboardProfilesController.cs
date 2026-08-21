@@ -531,7 +531,7 @@ namespace MacBookEco.App
                 _page.DisplayMode.Items.Add(new DisplayModeChoice(
                     58,
                     experimental
-                        ? "58 Hz High efficiency (experimental)"
+                        ? "58 Hz (experimental)"
                         : "58 Hz High efficiency"));
                 _page.DisplayMode.Items.Add(
                     new DisplayModeChoice(60, "60 Hz Native"));

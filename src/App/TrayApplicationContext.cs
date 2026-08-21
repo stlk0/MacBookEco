@@ -108,7 +108,7 @@ namespace MacBookEco.App
                 RunCommand(OptimizationCommand.SetDisplayRefreshRate(48));
             };
             _refresh58Item = TrackMutation(new ToolStripMenuItem(
-                "58 Hz High efficiency (experimental)"));
+                "58 Hz (experimental)"));
             _refresh58Item.Click += delegate {
                 RunCommand(OptimizationCommand.SetDisplayRefreshRate(58));
             };
@@ -320,7 +320,7 @@ namespace MacBookEco.App
                 : profile.GetTargetMode(58);
             _refresh58Item.Text = mode58 != null && !mode58.Experimental
                 ? "58 Hz High efficiency"
-                : "58 Hz High efficiency (experimental)";
+                : "58 Hz (experimental)";
             string installText = display.InstallText + "...";
             if (!string.Equals(
                 _installDisplayItem.Text,
