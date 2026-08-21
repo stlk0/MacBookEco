@@ -74,7 +74,12 @@ namespace MacBookEco.Platform.Windows
                     path.TargetId,
                     path.GdiDeviceName),
                 path.RefreshRateNumerator,
-                path.RefreshRateDenominator);
+                path.RefreshRateDenominator,
+                path.PixelRate,
+                path.ActiveWidth,
+                path.ActiveHeight,
+                path.TotalWidth,
+                path.TotalHeight);
         }
 
         private static MonitorIdentity CreateIdentity(MonitorDeviceRecord record)
@@ -156,7 +161,12 @@ namespace MacBookEco.Platform.Windows
             MonitorIdentity identity,
             DisplayEndpoint endpoint,
             uint refreshRateNumerator,
-            uint refreshRateDenominator)
+            uint refreshRateDenominator,
+            ulong pixelRate = 0,
+            uint activeWidth = 0,
+            uint activeHeight = 0,
+            uint totalWidth = 0,
+            uint totalHeight = 0)
         {
             if (identity == null)
             {
@@ -179,6 +189,11 @@ namespace MacBookEco.Platform.Windows
             Endpoint = endpoint;
             RefreshRateNumerator = refreshRateNumerator;
             RefreshRateDenominator = refreshRateDenominator;
+            PixelRate = pixelRate;
+            ActiveWidth = activeWidth;
+            ActiveHeight = activeHeight;
+            TotalWidth = totalWidth;
+            TotalHeight = totalHeight;
         }
 
         internal MonitorIdentity Identity { get; private set; }
@@ -188,5 +203,15 @@ namespace MacBookEco.Platform.Windows
         internal uint RefreshRateNumerator { get; private set; }
 
         internal uint RefreshRateDenominator { get; private set; }
+
+        internal ulong PixelRate { get; private set; }
+
+        internal uint ActiveWidth { get; private set; }
+
+        internal uint ActiveHeight { get; private set; }
+
+        internal uint TotalWidth { get; private set; }
+
+        internal uint TotalHeight { get; private set; }
     }
 }

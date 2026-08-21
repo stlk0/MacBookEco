@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using MacBookEco.AppPolicy;
+using MacBookEco.Core;
 using MacBookEco.Telemetry;
 
 namespace MacBookEco.App
@@ -19,6 +20,7 @@ namespace MacBookEco.App
         private readonly ContextMenuStrip _menu;
         private readonly ToolStripMenuItem _statusItem;
         private readonly ToolStripMenuItem _refresh48Item;
+        private readonly ToolStripMenuItem _refresh58Item;
         private readonly ToolStripMenuItem _refresh60Item;
         private readonly ToolStripMenuItem _installDisplayItem;
         private readonly ToolStripMenuItem _removeDisplayItem;
@@ -105,23 +107,29 @@ namespace MacBookEco.App
             _refresh48Item.Click += delegate {
                 RunCommand(OptimizationCommand.SetDisplayRefreshRate(48));
             };
+            _refresh58Item = TrackMutation(new ToolStripMenuItem(
+                "58 Hz High efficiency (experimental)"));
+            _refresh58Item.Click += delegate {
+                RunCommand(OptimizationCommand.SetDisplayRefreshRate(58));
+            };
             _refresh60Item = TrackMutation(new ToolStripMenuItem("60 Hz Native"));
             _refresh60Item.Click += delegate {
                 RunCommand(OptimizationCommand.SetDisplayRefreshRate(60));
             };
             displayMenu.DropDownItems.Add(_refresh48Item);
+            displayMenu.DropDownItems.Add(_refresh58Item);
             displayMenu.DropDownItems.Add(_refresh60Item);
             displayMenu.DropDownItems.Add(new ToolStripSeparator());
 
             _installDisplayItem = TrackMutation(
-                new ToolStripMenuItem("Install 48 Hz support..."));
+                new ToolStripMenuItem("Install 48 + 58 Hz support..."));
             _installDisplayItem.Click += delegate {
                 RunCommand(OptimizationCommand.InstallDisplaySupport());
             };
             displayMenu.DropDownItems.Add(_installDisplayItem);
 
             _removeDisplayItem = TrackMutation(
-                new ToolStripMenuItem("Remove 48 Hz support and restore..."));
+                new ToolStripMenuItem("Remove Eco display support and restore..."));
             _removeDisplayItem.Visible = false;
             _removeDisplayItem.Enabled = false;
             _removeDisplayItem.Click += delegate {
@@ -251,7 +259,7 @@ namespace MacBookEco.App
             OptimizationStateSnapshot state = _stateMonitor.Current;
             if (snapshot == null)
             {
-                ApplyDisplayMenuPolicy(state, false);
+                ApplyDisplayMenuPolicy(state, false, false);
                 return;
             }
 
@@ -273,8 +281,12 @@ namespace MacBookEco.App
             _statusItem.Text = charge + " \u00b7 " + power + " \u00b7 "
                 + refresh + " \u00b7 " + cpuProfile;
             _refresh48Item.Checked = snapshot.Display.IsRefreshRate(48.0);
+            _refresh58Item.Checked = snapshot.Display.IsRefreshRate(58.0);
             _refresh60Item.Checked = snapshot.Display.IsRefreshRate(60.0);
-            ApplyDisplayMenuPolicy(state, snapshot.Display.IsRefreshRate(48.0));
+            ApplyDisplayMenuPolicy(
+                state,
+                snapshot.Display.IsRefreshRate(48.0),
+                snapshot.Display.IsRefreshRate(58.0));
             _cpuEverydayItem.Checked = IsCpuPreset(state, PowerPreset.Normal);
             _cpuCoolItem.Checked = IsCpuPreset(state, PowerPreset.Cool);
             _cpuBatteryItem.Checked =
@@ -289,14 +301,26 @@ namespace MacBookEco.App
 
         private void ApplyDisplayMenuPolicy(
             OptimizationStateSnapshot state,
-            bool current48Hz)
+            bool current48Hz,
+            bool current58Hz)
         {
             DisplaySupportUiState display = DisplaySupportUiPolicy.Evaluate(
                 state,
                 current48Hz,
+                current58Hz,
                 _mutationControlsEnabled);
             SetMenuItemEnabled(_refresh48Item, display.CanSelect48Hz);
+            SetMenuItemEnabled(_refresh58Item, display.CanSelect58Hz);
             SetMenuItemEnabled(_refresh60Item, display.CanSelect60Hz);
+            DisplayProfile profile = state == null
+                ? null
+                : ProfileCatalog.GetById(state.DisplayProfileId);
+            DisplayRefreshMode mode58 = profile == null
+                ? null
+                : profile.GetTargetMode(58);
+            _refresh58Item.Text = mode58 != null && !mode58.Experimental
+                ? "58 Hz High efficiency"
+                : "58 Hz High efficiency (experimental)";
             string installText = display.InstallText + "...";
             if (!string.Equals(
                 _installDisplayItem.Text,

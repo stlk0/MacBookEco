@@ -129,6 +129,9 @@ namespace MacBookEco.App
                 text.AppendLine(
                     "48 Hz mode exposed by Windows: "
                     + optimizationState.Display48HzAvailable);
+                text.AppendLine(
+                    "58 Hz mode exposed by Windows: "
+                    + optimizationState.Display58HzAvailable);
             }
 
             text.AppendLine();

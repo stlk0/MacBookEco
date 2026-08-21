@@ -82,7 +82,7 @@ namespace MacBookEco.Core
         /// Canonical rational refresh reported by CCD.  This is the
         /// authoritative value for persistence and exact current-mode
         /// verification; RefreshRate remains the integer DEVMODE value used
-        /// only to request a driver-enumerated 48/60 Hz mode.
+        /// only to request a driver-enumerated 48/58/60 Hz mode.
         /// </summary>
         public uint RefreshRateNumerator { get; private set; }
         public uint RefreshRateDenominator { get; private set; }

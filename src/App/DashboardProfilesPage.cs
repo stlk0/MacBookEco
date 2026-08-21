@@ -5,6 +5,24 @@ using MacBookEco.AppPolicy;
 
 namespace MacBookEco.App
 {
+    internal sealed class DisplayModeChoice
+    {
+        internal DisplayModeChoice(int refreshRateHz, string displayName)
+        {
+            RefreshRateHz = refreshRateHz;
+            DisplayName = displayName ?? string.Empty;
+        }
+
+        internal int RefreshRateHz { get; private set; }
+
+        internal string DisplayName { get; private set; }
+
+        public override string ToString()
+        {
+            return DisplayName;
+        }
+    }
+
     // Owns the Profiles & controls view tree. The dashboard shell retains the
     // selected-profile state and passes its use-case callbacks explicitly.
     public sealed class DashboardProfilesPage
@@ -12,8 +30,8 @@ namespace MacBookEco.App
         private readonly object _customProfileItem;
         private readonly EventHandler _recommendedProfileChanged;
         private readonly EventHandler _cpuPresetChanged;
-        private readonly Action _apply48Hz;
-        private readonly Action _apply60Hz;
+        private readonly EventHandler _displayModeChanged;
+        private readonly Action<int> _applyDisplayMode;
         private readonly Action _installDisplaySupport;
         private readonly Action _removeDisplaySupport;
         private readonly Action _applyCpuPreset;
@@ -24,8 +42,8 @@ namespace MacBookEco.App
             object customProfileItem,
             EventHandler recommendedProfileChanged,
             EventHandler cpuPresetChanged,
-            Action apply48Hz,
-            Action apply60Hz,
+            EventHandler displayModeChanged,
+            Action<int> applyDisplayMode,
             Action installDisplaySupport,
             Action removeDisplaySupport,
             Action applyCpuPreset,
@@ -42,8 +60,12 @@ namespace MacBookEco.App
                 recommendedProfileChanged,
                 nameof(recommendedProfileChanged));
             _cpuPresetChanged = RequireCallback(cpuPresetChanged, nameof(cpuPresetChanged));
-            _apply48Hz = RequireCallback(apply48Hz, nameof(apply48Hz));
-            _apply60Hz = RequireCallback(apply60Hz, nameof(apply60Hz));
+            _displayModeChanged = RequireCallback(
+                displayModeChanged,
+                nameof(displayModeChanged));
+            _applyDisplayMode = RequireCallback(
+                applyDisplayMode,
+                nameof(applyDisplayMode));
             _installDisplaySupport = RequireCallback(
                 installDisplaySupport,
                 nameof(installDisplaySupport));
@@ -71,8 +93,8 @@ namespace MacBookEco.App
         public Label CpuState { get; private set; }
         public Label DisplayState { get; private set; }
         public Label DisplayCurrent { get; private set; }
-        public Button Display48Button { get; private set; }
-        public Button Display60Button { get; private set; }
+        public ComboBox DisplayMode { get; private set; }
+        public Button DisplayApplyButton { get; private set; }
         public Button InstallDisplayButton { get; private set; }
         public Button RemoveDisplayButton { get; private set; }
         public Button CpuApplyButton { get; private set; }
@@ -213,20 +235,37 @@ namespace MacBookEco.App
             layout.Controls.Add(DisplayCurrent, 0, 1);
 
             FlowLayoutPanel modes = CreateButtonRow();
-            Display48Button = DashboardTheme.CreateSecondaryButton(
-                "48 Hz Eco", delegate { _apply48Hz(); });
-            ConfigureDisplayModeButton(Display48Button);
-            Display48Button.Enabled = false;
-            modes.Controls.Add(Display48Button);
-            Display60Button = DashboardTheme.CreateSecondaryButton(
-                "60 Hz Native", delegate { _apply60Hz(); });
-            ConfigureDisplayModeButton(Display60Button);
-            modes.Controls.Add(Display60Button);
+            DisplayMode = CreateComboBox();
+            DisplayMode.Width = 230;
+            DisplayMode.Items.Add(new DisplayModeChoice(48, "48 Hz Eco"));
+            DisplayMode.Items.Add(new DisplayModeChoice(
+                58,
+                "58 Hz High efficiency (experimental)"));
+            DisplayMode.Items.Add(new DisplayModeChoice(60, "60 Hz Native"));
+            DisplayMode.SelectedIndexChanged += _displayModeChanged;
+            modes.Controls.Add(DisplayMode);
+            DisplayApplyButton = DashboardTheme.CreateSecondaryButton(
+                "Apply selected mode",
+                delegate
+                {
+                    DisplayModeChoice selected =
+                        DisplayMode.SelectedItem as DisplayModeChoice;
+                    if (selected != null)
+                    {
+                        _applyDisplayMode(selected.RefreshRateHz);
+                    }
+                });
+            ConfigureDisplayModeButton(DisplayApplyButton);
+            DisplayApplyButton.Enabled = false;
+            modes.Controls.Add(DisplayApplyButton);
             layout.Controls.Add(modes, 0, 2);
 
             layout.Controls.Add(CreateWrappingCaption(
-                "The highlighted button is the mode Windows currently reports. "
-                + "48 Hz reduces scan-out work; it does not underclock the GPU."), 0, 3);
+                "48 Hz is the Apple-supported compatibility mode. 58 Hz uses "
+                + "the native pixel clock with a longer V-blank to allow lower "
+                + "idle GPU memory clocks; unverified profiles are marked experimental."),
+                0,
+                3);
 
             Panel separator = new Panel();
             separator.Dock = DockStyle.Fill;
@@ -243,7 +282,8 @@ namespace MacBookEco.App
             support.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             support.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-            Label supportTitle = DashboardTheme.CreateCaptionLabel("48 Hz mode setup");
+            Label supportTitle = DashboardTheme.CreateCaptionLabel(
+                "Eco display modes setup");
             supportTitle.Font = DashboardTheme.CaptionStrongFont;
             support.Controls.Add(supportTitle, 0, 0);
             DisplayState = DashboardTheme.CreateCaptionLabel(
@@ -254,11 +294,13 @@ namespace MacBookEco.App
             supportActions.Anchor = AnchorStyles.Right;
             supportActions.AutoSize = true;
             InstallDisplayButton = DashboardTheme.CreateSecondaryButton(
-                "Install 48 Hz support", delegate { _installDisplaySupport(); });
+                "Install 48 + 58 Hz support",
+                delegate { _installDisplaySupport(); });
             InstallDisplayButton.Enabled = false;
             supportActions.Controls.Add(InstallDisplayButton);
             RemoveDisplayButton = DashboardTheme.CreateDangerOutlineButton(
-                "Remove 48 Hz support", delegate { _removeDisplaySupport(); });
+                "Remove Eco display support",
+                delegate { _removeDisplaySupport(); });
             RemoveDisplayButton.Visible = false;
             RemoveDisplayButton.Enabled = false;
             supportActions.Controls.Add(RemoveDisplayButton);

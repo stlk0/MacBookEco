@@ -124,8 +124,7 @@ namespace MacBookEco.Platform.Windows
                     return ManagedResourceState.Conflict;
                 }
 
-                byte[] expected = baseEdid.InsertDetailedTiming(
-                    profile.TargetTiming).ToByteArray();
+                byte[] expected = profile.BuildOverride(baseEdid).ToByteArray();
                 if (!Sha256Digest.Compute(expected).Equals(
                         journal.Payload.OwnedOverrideHash))
                 {

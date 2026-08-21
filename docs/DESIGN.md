@@ -41,14 +41,14 @@ operation.
 ## Display changes
 
 A reviewed display profile contains the exact model, panel, original EDID,
-native timing, GPU device, and added timing. Installation proceeds only when
-those values match and the target override location is free.
+native timing, GPU device, and added timings. Installation proceeds only when
+those values match and both required override locations are free.
 
 The helper records the expected owned bytes before writing them, then verifies
 the registry value byte-for-byte. Removal deletes only that exact owned value.
 A foreign or changed value is left untouched.
 
-For a 48/60 Hz switch, the application:
+For a 48/58/60 Hz switch, the application:
 
 1. resolves the internal panel and saves its stable identity and complete mode;
 2. starts the watchdog and waits for readiness;
@@ -58,6 +58,10 @@ For a 48/60 Hz switch, the application:
 
 The saved identity is resolved again before rollback. A Windows display number
 such as `DISPLAY1` is never treated as a durable identity.
+
+An older exact 48-only app-owned profile can be refreshed by the current
+helper. It first completes a journaled exact-owned restore, then starts a new
+journaled install. A foreign or modified override is never migrated.
 
 ## Power changes
 

@@ -21,7 +21,7 @@ namespace MacBookEco.App
         private readonly Func<
             AdminCommand,
             OptimizationActionResult> _runAdminCommand;
-        private readonly Func<bool> _is48HzModeAvailable;
+        private readonly Func<int, bool> _isRefreshRateModeAvailable;
         private readonly CpuHardwareSupportStatus _cpuHardwareSupport;
         private readonly bool _displayMutationsBlocked;
 
@@ -57,7 +57,8 @@ namespace MacBookEco.App
             _readEdidStatus = edidStatus.Read;
             _readPowerStatus = powerStatus.Read;
             _runAdminCommand = adminHelper.Run;
-            _is48HzModeAvailable = displayRefresh.Is48HzModeAvailable;
+            _isRefreshRateModeAvailable =
+                displayRefresh.IsRefreshRateModeAvailable;
             _cpuHardwareSupport = cpuHardwareSupport;
             _displayMutationsBlocked = ShouldBlockDisplayMutations(
                 startupRecovery);
@@ -75,7 +76,8 @@ namespace MacBookEco.App
             Func<AdminCommand, OptimizationActionResult> runAdminCommand,
             CpuHardwareSupportStatus cpuHardwareSupport,
             OptimizationActionResult startupRecovery = null,
-            Func<bool> is48HzModeAvailable = null)
+            Func<bool> is48HzModeAvailable = null,
+            Func<bool> is58HzModeAvailable = null)
         {
             if (setDisplayRefreshRate == null)
             {
@@ -101,8 +103,18 @@ namespace MacBookEco.App
             _readEdidStatus = readEdidStatus;
             _readPowerStatus = readPowerStatus;
             _runAdminCommand = runAdminCommand;
-            _is48HzModeAvailable = is48HzModeAvailable
-                ?? delegate { return false; };
+            _isRefreshRateModeAvailable = delegate(int refreshRateHz)
+            {
+                if (refreshRateHz == 48)
+                {
+                    return is48HzModeAvailable != null &&
+                        is48HzModeAvailable();
+                }
+
+                return refreshRateHz == 58 &&
+                    is58HzModeAvailable != null &&
+                    is58HzModeAvailable();
+            };
             _cpuHardwareSupport = cpuHardwareSupport;
             _displayMutationsBlocked = ShouldBlockDisplayMutations(
                 startupRecovery);
@@ -144,7 +156,7 @@ namespace MacBookEco.App
                     status.State == ManagedResourceState.Installed;
                 return installed
                     ? OptimizationActionResult.Successful(
-                        "48 Hz support is installed. Profile: "
+                        "Eco display support is installed and verified. Profile: "
                             + Safe(status.ProfileId) + ".",
                         OperationCode.None,
                         true)
@@ -285,7 +297,9 @@ namespace MacBookEco.App
                         ? "The active Windows power plan is owned by MacBook Eco."
                         : "The original or another Windows power plan is active.",
                     display.State == ManagedResourceState.Installed
-                        && Read48HzModeAvailability());
+                        && ReadModeAvailability(48),
+                    display.State == ManagedResourceState.Installed
+                        && ReadModeAvailability(58));
             }
             catch (Exception exception)
             {
@@ -333,11 +347,11 @@ namespace MacBookEco.App
             return string.IsNullOrWhiteSpace(value) ? "N/A" : value.Trim();
         }
 
-        private bool Read48HzModeAvailability()
+        private bool ReadModeAvailability(int refreshRateHz)
         {
             try
             {
-                return _is48HzModeAvailable();
+                return _isRefreshRateModeAvailable(refreshRateHz);
             }
             catch (Exception)
             {

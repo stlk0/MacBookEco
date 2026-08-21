@@ -22,6 +22,11 @@ namespace MacBookEco.Platform.Windows
         internal uint TargetId;
         internal uint RefreshRateNumerator;
         internal uint RefreshRateDenominator;
+        internal ulong PixelRate;
+        internal uint ActiveWidth;
+        internal uint ActiveHeight;
+        internal uint TotalWidth;
+        internal uint TotalHeight;
         internal uint OutputTechnology;
         internal bool IsInternal;
     }
@@ -82,7 +87,7 @@ namespace MacBookEco.Platform.Windows
                 List<ActiveDisplayPath> result = new List<ActiveDisplayPath>();
                 for (uint index = 0; index < pathCount; index++)
                 {
-                    result.Add(ReadPath(paths[index]));
+                    result.Add(ReadPath(paths[index], modes));
                 }
 
                 return result.AsReadOnly();
@@ -117,7 +122,9 @@ namespace MacBookEco.Platform.Windows
                     DisplayTopologyNativeMethods.DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL;
         }
 
-        private static ActiveDisplayPath ReadPath(DISPLAYCONFIG_PATH_INFO path)
+        private static ActiveDisplayPath ReadPath(
+            DISPLAYCONFIG_PATH_INFO path,
+            DISPLAYCONFIG_MODE_INFO[] modes)
         {
             DISPLAYCONFIG_SOURCE_DEVICE_NAME source =
                 new DISPLAYCONFIG_SOURCE_DEVICE_NAME();
@@ -163,9 +170,43 @@ namespace MacBookEco.Platform.Windows
             result.TargetId = path.TargetInfo.Id;
             result.RefreshRateNumerator = path.TargetInfo.RefreshRate.Numerator;
             result.RefreshRateDenominator = path.TargetInfo.RefreshRate.Denominator;
+            PopulateTargetSignal(path, modes, result);
             result.OutputTechnology = path.TargetInfo.OutputTechnology;
             result.IsInternal = IsEmbeddedOutput(path.TargetInfo.OutputTechnology);
             return result;
+        }
+
+        internal static void PopulateTargetSignal(
+            DISPLAYCONFIG_PATH_INFO path,
+            DISPLAYCONFIG_MODE_INFO[] modes,
+            ActiveDisplayPath result)
+        {
+            uint index = (path.Flags &
+                    DisplayTopologyNativeMethods
+                        .DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE) != 0
+                ? path.TargetInfo.ModeInfoIdx >> 16
+                : path.TargetInfo.ModeInfoIdx;
+            if (modes == null || index >= (uint)modes.Length)
+            {
+                return;
+            }
+
+            DISPLAYCONFIG_MODE_INFO mode = modes[index];
+            if (mode.InfoType !=
+                    DisplayTopologyNativeMethods.DISPLAYCONFIG_MODE_INFO_TYPE_TARGET ||
+                mode.Id != path.TargetInfo.Id ||
+                mode.AdapterId.ToUInt64() != path.TargetInfo.AdapterId.ToUInt64())
+            {
+                return;
+            }
+
+            DISPLAYCONFIG_VIDEO_SIGNAL_INFO signal =
+                mode.ModeInfo.TargetMode.TargetVideoSignalInfo;
+            result.PixelRate = signal.PixelRate;
+            result.ActiveWidth = signal.ActiveSize.Cx;
+            result.ActiveHeight = signal.ActiveSize.Cy;
+            result.TotalWidth = signal.TotalSize.Cx;
+            result.TotalHeight = signal.TotalSize.Cy;
         }
     }
 }

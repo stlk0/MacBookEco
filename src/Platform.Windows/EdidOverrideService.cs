@@ -58,12 +58,81 @@ namespace MacBookEco.Platform.Windows
                         journal.State == EdidJournalState.Installed ||
                         journal.State == EdidJournalState.Conflict)
                     {
-                        return ReconcileInstall(journals, journal);
+                        EdidOverrideOperationResult reconcileResult =
+                            ReconcileInstall(journals, journal);
+                        if (!reconcileResult.Succeeded)
+                        {
+                            return reconcileResult;
+                        }
+
+                        journal = journals.ReadEdid();
+                        if (!ShouldUpgradeInstalledProfile(journal))
+                        {
+                            return reconcileResult;
+                        }
+
+                        // Prove every new-install prerequisite before removing
+                        // the exact legacy override. The actual removal and
+                        // replacement remain separate durable transactions, so
+                        // every crash boundary can be reconciled without
+                        // treating foreign bytes as app-owned.
+                        ValidateUpgradePreconditions();
+                        EdidOverrideOperationResult restoreResult =
+                            ReconcileRestore(journals, journal);
+                        if (!restoreResult.Succeeded)
+                        {
+                            return restoreResult;
+                        }
+
+                        return BeginNewInstall(
+                            journals,
+                            journals.ReadEdid());
                     }
                 }
 
                 return BeginNewInstall(journals, journal);
             }
+        }
+
+        private bool ShouldUpgradeInstalledProfile(EdidJournal journal)
+        {
+            if (journal == null ||
+                journal.State != EdidJournalState.Installed ||
+                journal.Payload == null ||
+                journal.Payload.Target == null)
+            {
+                return false;
+            }
+
+            HardwareSnapshot hardware = discovery.Discover().ToCoreSnapshot();
+            ProfileSelectionResult selection = ProfileCatalog.Select(hardware);
+            return selection.HardwareSupported &&
+                ShouldRefreshInstalledProfile(
+                    journal.Payload.Target.ProfileId,
+                    selection.Profile.Id);
+        }
+
+        internal static bool ShouldRefreshInstalledProfile(
+            string installedProfileId,
+            string selectedProfileId)
+        {
+            return !string.IsNullOrWhiteSpace(installedProfileId) &&
+                !string.IsNullOrWhiteSpace(selectedProfileId) &&
+                !string.Equals(
+                    installedProfileId,
+                    selectedProfileId,
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void ValidateUpgradePreconditions()
+        {
+            WindowsHardwareSnapshot snapshot = discovery.Discover();
+            HardwareSnapshot hardware = snapshot.ToCoreSnapshot();
+            DisplayProfile profile = ProfileCatalog.Select(hardware).Profile;
+            ValidateInstallPreconditions(snapshot, hardware, profile);
+
+            ResolvedMonitorTarget target = targetResolver.ResolveActive();
+            ValidateActiveTarget(snapshot, hardware, target);
         }
 
         public EdidOverrideOperationResult RestoreOriginal()
@@ -481,7 +550,8 @@ namespace MacBookEco.Platform.Windows
             if (!match.CanInstall)
             {
                 throw new InvalidOperationException(
-                    "The supported panel has no free EDID descriptor slot for the owned override.");
+                    "The supported panel does not have enough free EDID "
+                        + "descriptor slots for the owned override.");
             }
         }
 
@@ -547,7 +617,7 @@ namespace MacBookEco.Platform.Windows
                 throw new ArgumentNullException(profile == null ? "profile" : "target");
 
             EdidBaseBlock baseEdid = new EdidBaseBlock(target.BaseEdid);
-            return baseEdid.InsertDetailedTiming(profile.TargetTiming).ToByteArray();
+            return profile.BuildOverride(baseEdid).ToByteArray();
         }
 
         private static void VerifyJournaledOwnershipHash(
@@ -574,7 +644,7 @@ namespace MacBookEco.Platform.Windows
                     journal.Generation.Next(),
                     DateTime.UtcNow));
                 return EdidOverrideOperationResult.Success(
-                    "The verified 48 Hz descriptor was installed. " +
+                    "The verified Eco display descriptors were installed. " +
                     "A display-adapter reload or reboot is required before the mode appears.",
                     installed.Payload.Target.ProfileId,
                     true);

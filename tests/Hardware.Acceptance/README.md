@@ -27,11 +27,11 @@ written below `build\acceptance\power-<UTC>`.
 Run this phase manually on reviewed hardware:
 
 1. Start at native 60 Hz with no foreign override.
-2. Install 48 Hz support through MacBook Eco and restart Windows.
-3. Confirm `60 -> 48 -> 60`, then let one unconfirmed change time out and verify
-   rollback.
-4. At 60 Hz, remove support, restart, and verify that 48 Hz is absent.
-5. Reinstall, restart, verify 48 Hz, and finish with a confirmed 48 Hz mode.
+2. Install 48 + 58 Hz support through MacBook Eco and restart Windows.
+3. Confirm `60 -> 48 -> 60` and `60 -> 58 -> 60`, then let one unconfirmed
+   change at each Eco rate time out and verify rollback.
+4. At 60 Hz, remove support, restart, and verify that 48 and 58 Hz are absent.
+5. Reinstall, restart, verify both rates, and finish at a confirmed Eco mode.
 
 Record the monitor identity, diagnostics before and after restarts, refresh
 rates, helper results, owned EDID bytes and hash, watchdog result, and final

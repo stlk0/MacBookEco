@@ -188,6 +188,22 @@ namespace MacBookEco.Core
             return -1;
         }
 
+        public int CountFreeDescriptors()
+        {
+            var count = 0;
+            for (var descriptorIndex = 1;
+                descriptorIndex < DescriptorCount;
+                descriptorIndex++)
+            {
+                if (IsFreeDescriptor(descriptorIndex))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
         public bool ContainsDetailedTiming(DetailedTiming timing)
         {
             if (timing == null)

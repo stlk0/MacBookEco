@@ -8,7 +8,7 @@ namespace MacBookEco.Platform.Windows
 {
     /// <summary>
     /// Switches only modes already enumerated by the display driver. It never
-    /// synthesizes timings. Use BeginTemporaryMode for the first 48 Hz test so
+    /// synthesizes timings. Use BeginTemporaryMode for the first Eco-mode test so
     /// an unconfirmed mode is restored automatically.
     /// </summary>
     public sealed class DisplayModeService
@@ -357,10 +357,10 @@ namespace MacBookEco.Platform.Windows
 
         private static void ValidateRefreshRate(int refreshRate)
         {
-            if (refreshRate != 48 && refreshRate != 60)
+            if (refreshRate != 48 && refreshRate != 58 && refreshRate != 60)
                 throw new ArgumentOutOfRangeException(
                     nameof(refreshRate),
-                    "Only the reviewed 48 Hz and native 60 Hz transitions are permitted.");
+                    "Only the reviewed 48/58 Hz and native 60 Hz transitions are permitted.");
         }
 
         private static void ValidateConfirmationTimeout(TimeSpan confirmationTimeout)

@@ -33,6 +33,9 @@ namespace MacBookEco.Tests.Watchdog
                     "Non-canonical refresh rationals fail closed",
                     delegate { RunInIsolatedRoot(TestNonCanonicalRational); }),
                 new TestCase(
+                    "Reviewed 58 Hz recovery mode is accepted",
+                    delegate { RunInIsolatedRoot(Test58HzSession); }),
+                new TestCase(
                     "Rollback marker wins the persistence-lock race",
                     delegate { RunInIsolatedRoot(TestRollbackMarkerWinsLockRace); })
             };
@@ -238,6 +241,35 @@ namespace MacBookEco.Tests.Watchdog
                     0,
                     48,
                     1));
+        }
+
+        private static void Test58HzSession(string testRoot)
+        {
+            DisplayWatchdogSessionState state =
+                DisplayWatchdogProtocol.CreateSession(
+                    CreateTargetIdentity(),
+                    new DisplayModeKey(
+                        3072,
+                        1920,
+                        32,
+                        58,
+                        0,
+                        0,
+                        0,
+                        58,
+                        1),
+                    TimeSpan.FromSeconds(10));
+            try
+            {
+                Check.That(
+                    DisplayWatchdogProtocol.ReadSession(state.Token)
+                        .OriginalMode.RefreshRate == 58,
+                    "The watchdog did not preserve the 58 Hz recovery mode.");
+            }
+            finally
+            {
+                DisplayWatchdogProtocol.Cleanup(state.Token);
+            }
         }
 
         private static string CreateIsolatedTestRoot()

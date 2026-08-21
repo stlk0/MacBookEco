@@ -106,7 +106,7 @@ namespace MacBookEco.App
                 OptimizationActionResult repair = _actions.InstallDisplaySupport();
                 if (!Succeeded(repair))
                 {
-                    return Stopped("48 Hz support repair", repair);
+                    return Stopped("Eco display support repair", repair);
                 }
 
                 restartRequired = repair.RestartRequired;
@@ -125,7 +125,7 @@ namespace MacBookEco.App
                 OptimizationActionResult remove = _actions.RemoveDisplaySupport();
                 if (!Succeeded(remove))
                 {
-                    return Stopped("48 Hz support removal", remove);
+                    return Stopped("Eco display support removal", remove);
                 }
 
                 restartRequired = restartRequired || remove.RestartRequired;

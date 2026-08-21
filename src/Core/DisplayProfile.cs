@@ -4,9 +4,34 @@ using System.Collections.ObjectModel;
 
 namespace MacBookEco.Core
 {
+    public sealed class DisplayRefreshMode
+    {
+        public DisplayRefreshMode(
+            int refreshRateHz,
+            DetailedTiming timing,
+            bool experimental)
+        {
+            if (refreshRateHz <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(refreshRateHz));
+            }
+
+            Timing = timing ?? throw new ArgumentNullException(nameof(timing));
+            RefreshRateHz = refreshRateHz;
+            Experimental = experimental;
+        }
+
+        public int RefreshRateHz { get; private set; }
+
+        public DetailedTiming Timing { get; private set; }
+
+        public bool Experimental { get; private set; }
+    }
+
     public sealed class DisplayProfile
     {
         private readonly string[] _systemModels;
+        private readonly ReadOnlyCollection<DisplayRefreshMode> _targetModes;
 
         public DisplayProfile(
             string id,
@@ -15,7 +40,7 @@ namespace MacBookEco.Core
             string panelHardwareId,
             string normalizedEdidSignature,
             DetailedTiming nativeTiming,
-            DetailedTiming targetTiming,
+            DisplayRefreshMode[] targetModes,
             string verifiedGpuName,
             string verifiedGpuDeviceIdPrefix,
             string verifiedDriverVersion)
@@ -62,18 +87,42 @@ namespace MacBookEco.Core
                 throw new ArgumentNullException(nameof(nativeTiming));
             }
 
-            if (targetTiming == null)
-            {
-                throw new ArgumentNullException(nameof(targetTiming));
-            }
-
-            if (
-                nativeTiming.HorizontalActive != targetTiming.HorizontalActive ||
-                nativeTiming.VerticalActive != targetTiming.VerticalActive)
+            if (targetModes == null || targetModes.Length == 0)
             {
                 throw new ArgumentException(
-                    "Native and target timings must use the same active dimensions.",
-                    nameof(targetTiming));
+                    "At least one target display mode is required.",
+                    nameof(targetModes));
+            }
+
+            var reviewedModes = new List<DisplayRefreshMode>();
+            var refreshRates = new HashSet<int>();
+            for (var index = 0; index < targetModes.Length; index++)
+            {
+                DisplayRefreshMode mode = targetModes[index];
+                if (mode == null)
+                {
+                    throw new ArgumentException(
+                        "Target display modes cannot be null.",
+                        nameof(targetModes));
+                }
+
+                if (!refreshRates.Add(mode.RefreshRateHz))
+                {
+                    throw new ArgumentException(
+                        "Target display refresh rates must be unique.",
+                        nameof(targetModes));
+                }
+
+                if (
+                    nativeTiming.HorizontalActive != mode.Timing.HorizontalActive ||
+                    nativeTiming.VerticalActive != mode.Timing.VerticalActive)
+                {
+                    throw new ArgumentException(
+                        "Native and target timings must use the same active dimensions.",
+                        nameof(targetModes));
+                }
+
+                reviewedModes.Add(mode);
             }
 
             Id = id.Trim();
@@ -93,7 +142,7 @@ namespace MacBookEco.Core
 
             PanelHardwareId = HardwareSnapshot.NormalizePanelHardwareId(panelHardwareId);
             NativeTiming = nativeTiming;
-            TargetTiming = targetTiming;
+            _targetModes = new ReadOnlyCollection<DisplayRefreshMode>(reviewedModes);
             VerifiedGpuName = NormalizeOptional(verifiedGpuName);
             VerifiedGpuDeviceIdPrefix = NormalizeOptional(verifiedGpuDeviceIdPrefix);
             VerifiedDriverVersion = NormalizeOptional(verifiedDriverVersion);
@@ -109,7 +158,7 @@ namespace MacBookEco.Core
 
         public DetailedTiming NativeTiming { get; private set; }
 
-        public DetailedTiming TargetTiming { get; private set; }
+        public ReadOnlyCollection<DisplayRefreshMode> TargetModes => _targetModes;
 
         public string VerifiedGpuName { get; private set; }
 
@@ -177,10 +226,21 @@ namespace MacBookEco.Core
             // not a hardware-identity mismatch.  Keep it separate so callers
             // can distinguish a supported panel from one that cannot safely
             // receive this profile's owned override.
-            if (hardware.Edid.FindFreeDescriptor() < 0)
+            var requiredDescriptors = 0;
+            for (var index = 0; index < _targetModes.Count; index++)
+            {
+                if (!hardware.Edid.ContainsDetailedTiming(
+                        _targetModes[index].Timing))
+                {
+                    requiredDescriptors++;
+                }
+            }
+
+            if (hardware.Edid.CountFreeDescriptors() < requiredDescriptors)
             {
                 installBlockers.Add(
-                    "The EDID has no free non-preferred descriptor slot for the owned override.");
+                    "The EDID does not have enough free non-preferred descriptor "
+                        + "slots for the owned override.");
             }
 
             return new DisplayProfileMatch(
@@ -205,7 +265,43 @@ namespace MacBookEco.Core
                     "The matching EDID cannot safely receive the owned override.");
             }
 
-            return hardware.Edid.InsertDetailedTiming(TargetTiming);
+            return BuildOverride(hardware.Edid);
+        }
+
+        public EdidBaseBlock BuildOverride(EdidBaseBlock baseEdid)
+        {
+            if (baseEdid == null)
+            {
+                throw new ArgumentNullException(nameof(baseEdid));
+            }
+
+            if (!NormalizedEdidSignature.Equals(baseEdid.NormalizedSignature) ||
+                !NativeTiming.Equals(baseEdid.PreferredTiming))
+            {
+                throw new InvalidOperationException(
+                    "The EDID does not match this display profile.");
+            }
+
+            EdidBaseBlock result = baseEdid;
+            for (var index = 0; index < _targetModes.Count; index++)
+            {
+                result = result.InsertDetailedTiming(_targetModes[index].Timing);
+            }
+
+            return result;
+        }
+
+        public DisplayRefreshMode GetTargetMode(int refreshRateHz)
+        {
+            for (var index = 0; index < _targetModes.Count; index++)
+            {
+                if (_targetModes[index].RefreshRateHz == refreshRateHz)
+                {
+                    return _targetModes[index];
+                }
+            }
+
+            return null;
         }
 
         private bool ContainsSystemModel(string value)

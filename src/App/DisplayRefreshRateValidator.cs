@@ -79,42 +79,88 @@ namespace MacBookEco.App
                     exception.Message);
             }
 
-            // Native 60 Hz is a recovery action. Entering 48 Hz additionally
-            // requires exact reviewed override bytes for this panel.
-            if (refreshRateHz == 48)
+            // Native 60 Hz is a recovery action. Entering either Eco mode
+            // additionally requires exact compiled override bytes for this
+            // panel. This accepts the recovery-only legacy profile for 48 Hz
+            // but never treats it as authorization for 58 Hz.
+            if (refreshRateHz == 48 || refreshRateHz == 58)
             {
                 try
                 {
                     HardwareSnapshot coreHardware = hardware.ToCoreSnapshot();
-                    ProfileSelectionResult selection =
-                        ProfileCatalog.Select(coreHardware);
-                    if (!selection.HardwareSupported)
-                    {
-                        return OptimizationActionResult.Unsupported(
-                            OperationCode.UnsupportedCapability,
-                            "No reviewed 48 Hz profile matches this Mac and panel.");
-                    }
-
                     byte[] currentOverride =
                         hardware.InternalDisplay.ExistingEdidOverride;
-                    byte[] reviewedOverride = selection.Profile
-                        .BuildOverride(coreHardware)
-                        .ToByteArray();
-                    if (!FixedTimeComparer.AreEqual(currentOverride, reviewedOverride))
+                    DisplayProfile profile = FindExactInstalledProfile(
+                        coreHardware,
+                        currentOverride,
+                        refreshRateHz);
+                    if (profile == null)
                     {
                         return OptimizationActionResult.Unsupported(
                             OperationCode.UnsupportedCapability,
-                            "The installed display override is absent or does not "
-                                + "match the reviewed 48 Hz profile.");
+                            "No exact installed Eco display profile matches this "
+                                + "Mac, panel, and requested refresh rate.");
                     }
                 }
                 catch (Exception exception)
                 {
                     return OptimizationActionResult.Failed(
                         OperationCode.ReadBackFailed,
-                        "The reviewed 48 Hz profile could not be verified: "
+                        "The installed Eco display profile could not be verified: "
                             + exception.Message,
                         exception.Message);
+                }
+            }
+
+            return null;
+        }
+
+        private static DisplayProfile FindExactInstalledProfile(
+            HardwareSnapshot hardware,
+            byte[] currentOverride,
+            int refreshRateHz)
+        {
+            if (hardware == null || currentOverride == null)
+            {
+                return null;
+            }
+
+            for (var index = 0; index < ProfileCatalog.All.Count; index++)
+            {
+                DisplayProfile profile = ProfileCatalog.All[index];
+                if (profile.GetTargetMode(refreshRateHz) != null &&
+                    profile.Match(hardware).HardwareSupported &&
+                    FixedTimeComparer.AreEqual(
+                        currentOverride,
+                        profile.BuildOverride(hardware).ToByteArray()))
+                {
+                    return profile;
+                }
+            }
+
+            // Old 48-only profile IDs remain available by ID for journal
+            // recovery, but they are intentionally not part of All. Match the
+            // known legacy variant selected by the same hardware signature.
+            if (refreshRateHz == 48)
+            {
+                string[] legacyIds =
+                {
+                    ProfileCatalog.MacBookPro161Appa044ProfileId,
+                    ProfileCatalog.MacBookPro161Appa044Faf4ProfileId,
+                    ProfileCatalog.MacBookPro161Appa0444b2eProfileId
+                };
+                for (var index = 0; index < legacyIds.Length; index++)
+                {
+                    DisplayProfile profile = ProfileCatalog.GetById(
+                        legacyIds[index]);
+                    if (profile != null &&
+                        profile.Match(hardware).HardwareSupported &&
+                        FixedTimeComparer.AreEqual(
+                            currentOverride,
+                            profile.BuildOverride(hardware).ToByteArray()))
+                    {
+                        return profile;
+                    }
                 }
             }
 

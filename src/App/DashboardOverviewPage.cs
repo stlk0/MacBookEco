@@ -249,7 +249,8 @@ namespace MacBookEco.App
                     + display.Height.ToString(CultureInfo.InvariantCulture)
                 : "Resolution N/A";
             _displayCard.Status = ToCardStatus(display.Availability);
-            _displayCard.StatusText = display.IsRefreshRate(48.0)
+            _displayCard.StatusText = display.IsRefreshRate(48.0) ||
+                    display.IsRefreshRate(58.0)
                 ? "Eco"
                 : (display.IsRefreshRate(60.0) ? "Native" : string.Empty);
         }
