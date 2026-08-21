@@ -118,19 +118,29 @@ namespace MacBookEco.Platform.Windows
                             journal.Payload.OwnedOverrideHash));
                 }
 
-                EdidBaseBlock baseEdid = new EdidBaseBlock(target.BaseEdid);
+                EdidBaseBlock originalEdid;
+                if (!target.TryResolveOriginalBaseEdid(
+                        journal.Payload.Target.Monitor,
+                        out originalEdid))
+                {
+                    return ManagedResourceState.Conflict;
+                }
+
                 if (!string.Equals(
                         profile.PanelHardwareId,
                         target.HardwareId,
                         StringComparison.Ordinal) ||
                     !profile.NormalizedEdidSignature.Equals(
-                        baseEdid.NormalizedSignature) ||
-                    !profile.NativeTiming.Equals(baseEdid.PreferredTiming))
+                        originalEdid.NormalizedSignature) ||
+                    !profile.NativeTiming.Equals(originalEdid.PreferredTiming))
                 {
                     return ManagedResourceState.Conflict;
                 }
 
-                byte[] expected = profile.BuildOverride(baseEdid).ToByteArray();
+                byte[] expected = target.BaseEdidHash.Equals(
+                    journal.Payload.OwnedOverrideHash)
+                        ? target.BaseEdid
+                        : profile.BuildOverride(originalEdid).ToByteArray();
                 if (!Sha256Digest.Compute(expected).Equals(
                         journal.Payload.OwnedOverrideHash))
                 {

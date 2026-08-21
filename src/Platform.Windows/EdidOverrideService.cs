@@ -76,7 +76,7 @@ namespace MacBookEco.Platform.Windows
                         // replacement remain separate durable transactions, so
                         // every crash boundary can be reconciled without
                         // treating foreign bytes as app-owned.
-                        ValidateUpgradePreconditions();
+                        ValidateUpgradePreconditions(journal);
                         EdidOverrideOperationResult restoreResult =
                             ReconcileRestore(journals, journal);
                         if (!restoreResult.Succeeded)
@@ -112,15 +112,23 @@ namespace MacBookEco.Platform.Windows
                     selection.Profile.Id);
         }
 
-        private void ValidateUpgradePreconditions()
+        private void ValidateUpgradePreconditions(EdidJournal journal)
         {
             WindowsHardwareSnapshot snapshot = discovery.Discover();
-            HardwareSnapshot hardware = snapshot.ToCoreSnapshot();
-            DisplayProfile profile = ProfileCatalog.Select(hardware).Profile;
-            ValidateInstallPreconditions(snapshot, hardware, profile);
-
+            HardwareSnapshot observedHardware = snapshot.ToCoreSnapshot();
             ResolvedMonitorTarget target = targetResolver.ResolveActive();
-            ValidateActiveTarget(snapshot, hardware, target);
+            ValidateActiveTarget(snapshot, observedHardware, target);
+            HardwareSnapshot installHardware = ResolveJournaledOriginalHardware(
+                journal,
+                observedHardware,
+                target,
+                true);
+            DisplayProfile profile = ProfileCatalog.Select(
+                installHardware).Profile;
+            ValidateInstallPreconditions(
+                snapshot,
+                installHardware,
+                profile);
         }
 
         public EdidOverrideOperationResult RestoreOriginal()
@@ -153,13 +161,30 @@ namespace MacBookEco.Platform.Windows
             EdidJournal previous)
         {
             WindowsHardwareSnapshot snapshot = discovery.Discover();
-            HardwareSnapshot hardware = snapshot.ToCoreSnapshot();
-            ProfileSelectionResult selection = ProfileCatalog.Select(hardware);
-            DisplayProfile profile = selection.Profile;
-            ValidateInstallPreconditions(snapshot, hardware, profile);
-
+            HardwareSnapshot observedHardware = snapshot.ToCoreSnapshot();
             ResolvedMonitorTarget target = targetResolver.ResolveActive();
-            ValidateActiveTarget(snapshot, hardware, target);
+            ValidateActiveTarget(snapshot, observedHardware, target);
+
+            HardwareSnapshot installHardware = observedHardware;
+            ProfileSelectionResult selection = ProfileCatalog.Select(
+                installHardware);
+            if (!selection.CanInstall &&
+                previous != null &&
+                previous.State == EdidJournalState.Restored)
+            {
+                installHardware = ResolveJournaledOriginalHardware(
+                    previous,
+                    observedHardware,
+                    target,
+                    false);
+                selection = ProfileCatalog.Select(installHardware);
+            }
+
+            DisplayProfile profile = selection.Profile;
+            ValidateInstallPreconditions(
+                snapshot,
+                installHardware,
+                profile);
 
             // The pre-intent comparison proves that a new operation cannot
             // take ownership of an existing or incorrectly typed value.
@@ -169,9 +194,15 @@ namespace MacBookEco.Platform.Windows
                     "A pre-existing EDID override was found. MacBook Eco will not merge or overwrite it.");
             }
 
-            byte[] expectedOverride = CompileOwnedOverride(profile, target);
+            byte[] expectedOverride = profile.BuildOverride(
+                installHardware.Edid).ToByteArray();
+            MonitorIdentity originalIdentity =
+                MonitorIdentity.FromExactBaseEdid(
+                    target.DeviceInstanceId,
+                    target.HardwareId,
+                    installHardware.Edid);
             EdidJournalPayload payload = new EdidJournalPayload(
-                target.CreateIdentity(profile.Id),
+                new EdidTargetIdentity(profile.Id, originalIdentity),
                 Sha256Digest.Compute(expectedOverride));
             DateTime now = DateTime.UtcNow;
             EdidJournal intent = new EdidJournal(
@@ -444,13 +475,32 @@ namespace MacBookEco.Platform.Windows
                     "The active internal display no longer matches the durable EDID identity.");
             }
 
-            byte[] expectedOverride = CompileOwnedOverride(profile, target);
+            EdidBaseBlock originalEdid;
+            if (!target.TryResolveOriginalBaseEdid(
+                    journal.Payload.Target.Monitor,
+                    out originalEdid))
+            {
+                throw new SecureStateConflictException(
+                    "The original EDID could not be proven during install " +
+                    "reconciliation.");
+            }
+
+            HardwareSnapshot installHardware = WithEdid(
+                hardware,
+                originalEdid);
+            ValidateInstallHardware(installHardware, profile);
+
+            byte[] expectedOverride = CompileOwnedOverride(
+                profile,
+                target,
+                journal.Payload.Target.Monitor,
+                journal.Payload.OwnedOverrideHash);
             VerifyJournaledOwnershipHash(journal, expectedOverride);
             return new InstallContext(
                 target,
                 expectedOverride,
                 snapshot,
-                hardware,
+                installHardware,
                 profile);
         }
 
@@ -533,8 +583,21 @@ namespace MacBookEco.Platform.Windows
                     liveState);
             }
 
-            ValidateRestoreProfile(profile, target);
-            byte[] expectedOverride = CompileOwnedOverride(profile, target);
+            EdidBaseBlock originalEdid;
+            if (!target.TryResolveOriginalBaseEdid(
+                    journal.Payload.Target.Monitor,
+                    out originalEdid))
+            {
+                throw new SecureStateConflictException(
+                    "The original EDID could not be proven for restore.");
+            }
+
+            ValidateRestoreProfile(profile, target, originalEdid);
+            byte[] expectedOverride = CompileOwnedOverride(
+                profile,
+                target,
+                journal.Payload.Target.Monitor,
+                journal.Payload.OwnedOverrideHash);
             VerifyJournaledOwnershipHash(journal, expectedOverride);
             return new RestoreContext(target, expectedOverride, null);
         }
@@ -546,6 +609,71 @@ namespace MacBookEco.Platform.Windows
         {
             ValidateInstallHardware(hardware, profile);
             ValidateInstallMutationPreconditions(snapshot, hardware, profile);
+        }
+
+        private static HardwareSnapshot ResolveJournaledOriginalHardware(
+            EdidJournal journal,
+            HardwareSnapshot observedHardware,
+            ResolvedMonitorTarget target,
+            bool requireOwnedOverride)
+        {
+            RequirePayload(journal);
+            if (observedHardware == null || target == null ||
+                !target.MatchesIdentity(
+                    journal.Payload.Target.Monitor,
+                    journal.Payload.OwnedOverrideHash))
+            {
+                throw new SecureStateConflictException(
+                    "The cached display cannot be tied to the protected " +
+                    "journal identity.");
+            }
+
+            byte[] liveOverride = target.ReadOverride();
+            EdidLiveOverrideState liveState =
+                EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                    liveOverride,
+                    journal.Payload.OwnedOverrideHash);
+            if ((requireOwnedOverride &&
+                 liveState != EdidLiveOverrideState.ExactOwned) ||
+                (!requireOwnedOverride &&
+                 liveState != EdidLiveOverrideState.Absent))
+            {
+                throw new SecureStateConflictException(
+                    "The live override does not match the protected " +
+                    "refresh transition boundary.");
+            }
+
+            EdidBaseBlock originalEdid;
+            if (!target.TryResolveOriginalBaseEdid(
+                    journal.Payload.Target.Monitor,
+                    out originalEdid))
+            {
+                throw new SecureStateConflictException(
+                    "The exact original EDID could not be recovered from " +
+                    "the protected journal fingerprint.");
+            }
+
+            return WithEdid(observedHardware, originalEdid);
+        }
+
+        private static HardwareSnapshot WithEdid(
+            HardwareSnapshot hardware,
+            EdidBaseBlock edid)
+        {
+            if (hardware == null)
+            {
+                throw new ArgumentNullException(nameof(hardware));
+            }
+
+            return new HardwareSnapshot(
+                hardware.SystemManufacturer,
+                hardware.SystemModel,
+                hardware.IsInternalDisplay,
+                hardware.PanelHardwareId,
+                edid,
+                hardware.GpuName,
+                hardware.GpuDeviceId,
+                hardware.DriverVersion);
         }
 
         private static void ValidateInstallHardware(
@@ -632,22 +760,22 @@ namespace MacBookEco.Platform.Windows
 
         private static void ValidateRestoreProfile(
             DisplayProfile profile,
-            ResolvedMonitorTarget target)
+            ResolvedMonitorTarget target,
+            EdidBaseBlock originalEdid)
         {
-            if (profile == null || target == null)
+            if (profile == null || target == null || originalEdid == null)
             {
                 throw new SecureStateConflictException(
                     "The restore profile or monitor target is unavailable.");
             }
 
-            EdidBaseBlock baseEdid = new EdidBaseBlock(target.BaseEdid);
             if (!string.Equals(
                     profile.PanelHardwareId,
                     target.HardwareId,
                     StringComparison.Ordinal) ||
                 !profile.NormalizedEdidSignature.Equals(
-                    baseEdid.NormalizedSignature) ||
-                !profile.NativeTiming.Equals(baseEdid.PreferredTiming))
+                    originalEdid.NormalizedSignature) ||
+                !profile.NativeTiming.Equals(originalEdid.PreferredTiming))
             {
                 throw new SecureStateConflictException(
                     "The stored monitor identity no longer matches the compiled display profile.");
@@ -656,13 +784,39 @@ namespace MacBookEco.Platform.Windows
 
         private static byte[] CompileOwnedOverride(
             DisplayProfile profile,
-            ResolvedMonitorTarget target)
+            ResolvedMonitorTarget target,
+            MonitorIdentity originalIdentity,
+            Sha256Digest ownedOverrideHash)
         {
-            if (profile == null || target == null)
-                throw new ArgumentNullException(profile == null ? "profile" : "target");
+            if (profile == null || target == null || originalIdentity == null ||
+                ownedOverrideHash == null)
+            {
+                throw new ArgumentNullException(
+                    profile == null
+                        ? "profile"
+                        : target == null
+                            ? "target"
+                            : originalIdentity == null
+                                ? "originalIdentity"
+                                : "ownedOverrideHash");
+            }
 
-            EdidBaseBlock baseEdid = new EdidBaseBlock(target.BaseEdid);
-            return profile.BuildOverride(baseEdid).ToByteArray();
+            if (target.BaseEdidHash.Equals(ownedOverrideHash))
+            {
+                return target.BaseEdid;
+            }
+
+            EdidBaseBlock originalEdid;
+            if (!target.TryResolveOriginalBaseEdid(
+                    originalIdentity,
+                    out originalEdid))
+            {
+                throw new SecureStateConflictException(
+                    "The original EDID could not be proven while compiling " +
+                    "the owned override.");
+            }
+
+            return profile.BuildOverride(originalEdid).ToByteArray();
         }
 
         private static void VerifyJournaledOwnershipHash(

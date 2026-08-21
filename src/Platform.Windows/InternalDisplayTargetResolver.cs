@@ -195,7 +195,7 @@ namespace MacBookEco.Platform.Windows
                         identity.ManufacturerCode,
                         StringComparison.Ordinal) &&
                     MatchesFingerprint(
-                        Sha256Digest.Compute(baseBlock.ToByteArray()),
+                        baseBlock,
                         identity.EdidFingerprint,
                         ownedOverrideHash);
             }
@@ -214,13 +214,32 @@ namespace MacBookEco.Platform.Windows
         }
 
         private static bool MatchesFingerprint(
-            Sha256Digest actual,
+            EdidBaseBlock observed,
             Sha256Digest original,
             Sha256Digest ownedOverride)
         {
-            return actual != null &&
-                (actual.Equals(original) ||
-                 (ownedOverride != null && actual.Equals(ownedOverride)));
+            if (observed == null)
+            {
+                return false;
+            }
+
+            Sha256Digest actual = Sha256Digest.Compute(
+                observed.ToByteArray());
+            if (actual.Equals(original) ||
+                (ownedOverride != null && actual.Equals(ownedOverride)))
+            {
+                return true;
+            }
+
+            if (ownedOverride == null)
+            {
+                return false;
+            }
+
+            EdidBaseBlock recovered;
+            return observed.TryRecoverExactOriginal(
+                original,
+                out recovered);
         }
 
         private static string NormalizeInstanceId(string value)
@@ -374,11 +393,6 @@ namespace MacBookEco.Platform.Windows
             }
         }
 
-        internal EdidTargetIdentity CreateIdentity(string profileId)
-        {
-            return new EdidTargetIdentity(profileId, MonitorIdentity);
-        }
-
         internal bool MatchesIdentity(EdidTargetIdentity identity)
         {
             return identity != null && MatchesIdentity(identity.Monitor);
@@ -393,22 +407,64 @@ namespace MacBookEco.Platform.Windows
             MonitorIdentity identity,
             Sha256Digest ownedOverrideHash)
         {
-            return identity != null &&
-                string.Equals(
+            if (identity == null ||
+                !string.Equals(
                     DeviceInstanceId,
                     identity.MonitorInstanceId,
-                    StringComparison.Ordinal) &&
-                string.Equals(
+                    StringComparison.Ordinal) ||
+                !string.Equals(
                     HardwareId,
                     identity.PanelHardwareId,
-                    StringComparison.Ordinal) &&
-                string.Equals(
+                    StringComparison.Ordinal) ||
+                !string.Equals(
                     ManufacturerCode,
                     identity.ManufacturerCode,
-                    StringComparison.Ordinal) &&
-                (BaseEdidHash.Equals(identity.EdidFingerprint) ||
-                 (ownedOverrideHash != null &&
-                  BaseEdidHash.Equals(ownedOverrideHash)));
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (BaseEdidHash.Equals(identity.EdidFingerprint) ||
+                (ownedOverrideHash != null &&
+                 BaseEdidHash.Equals(ownedOverrideHash)))
+            {
+                return true;
+            }
+
+            if (ownedOverrideHash == null)
+            {
+                return false;
+            }
+
+            EdidBaseBlock original;
+            return TryResolveOriginalBaseEdid(identity, out original);
+        }
+
+        internal bool TryResolveOriginalBaseEdid(
+            MonitorIdentity identity,
+            out EdidBaseBlock original)
+        {
+            original = null;
+            if (identity == null ||
+                !string.Equals(
+                    DeviceInstanceId,
+                    identity.MonitorInstanceId,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    HardwareId,
+                    identity.PanelHardwareId,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    ManufacturerCode,
+                    identity.ManufacturerCode,
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            return new EdidBaseBlock(baseEdid).TryRecoverExactOriginal(
+                identity.EdidFingerprint,
+                out original);
         }
 
         internal byte[] ReadOverride()

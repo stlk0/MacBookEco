@@ -46,6 +46,7 @@ function Assert-DoesNotContain {
 }
 
 $edid = Read-Source 'src\Platform.Windows\EdidOverrideService.cs'
+$edidBaseBlock = Read-Source 'src\Core\EdidBaseBlock.cs'
 $overrideRegistry = Read-Source 'src\Platform.Windows\EdidOverrideRegistry.cs'
 $devnodeReader = Read-Source 'src\Platform.Windows\MonitorDevnodeReader.cs'
 $devnodeAccess = Read-Source 'src\Platform.Windows\MonitorDevnodeAccess.cs'
@@ -71,6 +72,24 @@ foreach ($forbidden in @(
         'DisplayModeService'
     )) {
     Assert-DoesNotContain -Source $edid -Token $forbidden -Boundary 'EDID service'
+}
+foreach ($required in @(
+        'ResolveJournaledOriginalHardware',
+        'ClassifyProtectedJournalOverride',
+        'TryResolveOriginalBaseEdid'
+    )) {
+    Assert-Contains -Source $edid -Token $required `
+        -Boundary 'stale EDID refresh recovery'
+}
+Assert-Contains -Source $statusReaders -Token 'TryResolveOriginalBaseEdid' `
+    -Boundary 'stale EDID terminal read-back'
+foreach ($required in @(
+        'TryRecoverExactOriginal',
+        'Sha256Digest.Compute(candidate).Equals',
+        'IsDetailedTimingDescriptor(descriptorIndex)'
+    )) {
+    Assert-Contains -Source $edidBaseBlock -Token $required `
+        -Boundary 'exact original EDID recovery'
 }
 Assert-Contains -Source $overrideRegistry -Token 'DeleteExact' `
     -Boundary 'EDID registry adapter'

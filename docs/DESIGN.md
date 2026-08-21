@@ -67,6 +67,13 @@ the exact live 128-byte override. It then completes a compare-before-delete
 restore and starts a new journaled install. A missing journal, mismatched hash,
 foreign value, or modified override is never migrated.
 
+Windows can retain the old effective EDID until restart after that exact-owned
+override is removed. To avoid an intermediate restart, the helper may recover
+the original base block only by reversing app-supported non-preferred DTD
+insertions and matching the protected full-block SHA-256 exactly. It records
+the replacement intent before writing the new override, so only the final
+restart is required. No normalized or model-only match authorizes this path.
+
 ## Power changes
 
 CPU presets are written to a duplicated, application-owned Windows power plan;

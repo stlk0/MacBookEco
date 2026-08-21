@@ -66,6 +66,9 @@ namespace MacBookEco.Tests.Core
                 Test(
                     "Normalized signature is stable after managed insertion",
                     NormalizedSignature),
+                Test(
+                    "Exact journal fingerprint recovers a stale owned EDID",
+                    RecoverStaleOwnedEdid),
                 Test("Known hardware selects the reviewed profile", KnownProfileMatches),
                 Test(
                     "Legacy 48 Hz profile remains recovery-only",
@@ -210,6 +213,67 @@ namespace MacBookEco.Tests.Core
                 modified.InsertDetailedTiming(target48)
                     .InsertDetailedTiming(target58)
                     .ToByteArray());
+        }
+
+        private static void RecoverStaleOwnedEdid()
+        {
+            EdidBaseBlock original = CreateOriginal();
+            Sha256Digest originalFingerprint = Sha256Digest.Compute(
+                original.ToByteArray());
+            EdidBaseBlock stale59 = original.InsertDetailedTiming(
+                DetailedTiming.ParseHex(
+                    "C6 94 00 50 C0 80 80 70 08 20 98 08 59 D7 10 00 00 1A"));
+
+            EdidBaseBlock recovered;
+            Check.True(stale59.TryRecoverExactOriginal(
+                originalFingerprint,
+                out recovered));
+            Check.BytesEqual(
+                original.ToByteArray(),
+                recovered.ToByteArray());
+
+            EdidBaseBlock staleEco = original
+                .InsertDetailedTiming(DetailedTiming.ParseHex(Exact48Dtd))
+                .InsertDetailedTiming(DetailedTiming.ParseHex(Exact58Dtd));
+            Check.True(staleEco.TryRecoverExactOriginal(
+                originalFingerprint,
+                out recovered));
+            Check.BytesEqual(
+                original.ToByteArray(),
+                recovered.ToByteArray());
+
+            MonitorDeviceRecord record = new MonitorDeviceRecord();
+            record.DeviceInstanceId =
+                "MONITOR\\APPA044\\STALE-OWNED-OVERRIDE";
+            record.HardwareId = "MONITOR\\APPA044";
+            record.Edid = stale59.ToByteArray();
+            ResolvedMonitorTarget target = ResolvedMonitorTarget.FromRecord(
+                record,
+                null,
+                0,
+                0);
+            MonitorIdentity identity = MonitorIdentity.FromExactBaseEdid(
+                record.DeviceInstanceId,
+                record.HardwareId,
+                original);
+            Check.False(target.MatchesIdentity(identity));
+            Check.True(target.MatchesIdentity(
+                identity,
+                Sha256Digest.Compute(staleEco.ToByteArray())));
+            Check.True(target.TryResolveOriginalBaseEdid(
+                identity,
+                out recovered));
+            Check.BytesEqual(
+                original.ToByteArray(),
+                recovered.ToByteArray());
+
+            byte[] foreignBytes = stale59.ToByteArray();
+            foreignBytes[24] ^= 0x01;
+            EdidBaseBlock.UpdateChecksum(foreignBytes);
+            Check.False(new EdidBaseBlock(foreignBytes)
+                .TryRecoverExactOriginal(
+                    originalFingerprint,
+                    out recovered));
         }
 
         private static void NormalizedSignature()
