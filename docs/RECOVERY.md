@@ -15,7 +15,7 @@ retry the same action only after checking the reported live state.
 
 ## Display mode
 
-For an unconfirmed 48/60 Hz change, use the rollback option or wait for the
+For an unconfirmed 48/58/60 Hz change, use the rollback option or wait for the
 countdown. The watchdog restores the saved mode after re-identifying the same
 internal panel.
 
@@ -23,12 +23,13 @@ If Windows display topology changed and automatic rollback could not identify
 the panel, select the native mode in Windows display settings and save the
 Diagnostics output.
 
-## 48 Hz support
+## Eco display support
 
 For `InstallPending`, `RestorePending`, or `Conflict`, retry the same install or
 remove action from the current build. MacBook Eco will compare the recorded
 identity and exact live override before making another change. It will not
-delete a foreign or modified override.
+delete a foreign or modified override. This also allows a newer build to replace
+an older app-owned timing profile without first uninstalling the older build.
 
 ## Power plan
 
@@ -44,7 +45,7 @@ with `powercfg /list` and remove only its exact inactive GUID.
 
 If uninstall reports that recovery is required, choose automatic recovery. The
 uninstaller asks MacBook Eco to return the panel to native 60 Hz, repair only
-exact application-owned display state when needed, remove 48 Hz support, and
+exact application-owned display state when needed, remove Eco display support, and
 restore the original power plan. It continues only after read-back verifies both
 resources as restored. Accept the UAC and display-mode confirmation prompts; a
 restart may be requested after removal.

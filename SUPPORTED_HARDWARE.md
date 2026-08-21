@@ -16,13 +16,19 @@ exactly. Other systems remain diagnostic-only.
 | GPU | AMD Radeon Pro 5300M or 5500M (`VEN_1002&DEV_7340`) |
 | Tested Radeon Pro 5300M driver | `30.0.13045.22003` |
 | Tested Radeon Pro 5500M driver | `26.20.13003.5002` |
-| Added mode | 48 Hz |
+| Added modes | 48 Hz and 58 Hz |
 | 48 Hz DTD | `DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A` |
-| Pixel clock | `373.40 MHz` |
+| 58 Hz DTD | `E7 91 00 50 C0 80 80 70 08 20 98 08 59 D7 10 00 00 1A` |
+| Pixel clocks | `373.40 MHz` at 48 Hz; native `373.51 MHz` at 58 Hz |
 
 The model, panel, normalized original EDID, native timing, dimensions, and GPU
 device ID must match. A different driver version produces a warning rather than
 changing the reviewed timing.
+
+The 58 Hz mode is hardware-verified for the primary Radeon Pro 5300M profile
+(`CDA0...F3F5`). It is selectable but marked experimental for the alternate
+5300M and 5500M profiles. Every transition retains exact CCD signal read-back,
+confirmation, and watchdog rollback.
 
 Public diagnostics include a sanitized base-block fixture for proposing another
 profile. Per-unit values and secondary descriptors are removed, the checksum is

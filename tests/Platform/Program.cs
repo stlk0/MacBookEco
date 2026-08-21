@@ -122,8 +122,8 @@ namespace MacBookEco.Tests.Platform
                         displayJournal.Payload.Target.ProfileId);
                     byte[] expectedOverride = journalProfile == null
                         ? null
-                        : new EdidBaseBlock(activeTarget.BaseEdid)
-                            .InsertDetailedTiming(journalProfile.TargetTiming)
+                        : journalProfile.BuildOverride(
+                            new EdidBaseBlock(activeTarget.BaseEdid))
                             .ToByteArray();
                     Console.WriteLine(
                         "Display journal generation: " +

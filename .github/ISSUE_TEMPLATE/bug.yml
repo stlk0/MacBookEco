@@ -35,7 +35,7 @@ body:
     id: version
     attributes:
       label: MacBook Eco version
-      placeholder: 0.1.4-alpha
+      placeholder: 0.1.5-alpha
     validations:
       required: true
 

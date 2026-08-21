@@ -17,49 +17,109 @@ namespace MacBookEco.Core
         public const string MacBookPro161Appa0444b2eProfileId =
             "macbookpro16-1-appa044-4b2ea063-48hz";
 
+        public const string MacBookPro161Appa044EcoModesProfileId =
+            "macbookpro16-1-appa044-48-58hz-v2";
+
+        public const string MacBookPro161Appa044Faf4EcoModesProfileId =
+            "macbookpro16-1-appa044-faf4a9c1-48-58hz-v2";
+
+        public const string MacBookPro161Appa0444b2eEcoModesProfileId =
+            "macbookpro16-1-appa044-4b2ea063-48-58hz-v2";
+
+        private static readonly DetailedTiming NativeAppa044Timing =
+            DetailedTiming.ParseHex(
+                "E7 91 00 50 C0 80 37 70 08 20 98 08 59 D7 10 00 00 1A");
+
+        private static readonly DetailedTiming Appa04448HzTiming =
+            DetailedTiming.ParseHex(
+                "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A");
+
+        private static readonly DetailedTiming Appa04458HzTiming =
+            DetailedTiming.ParseHex(
+                "E7 91 00 50 C0 80 80 70 08 20 98 08 59 D7 10 00 00 1A");
+
         private static readonly ReadOnlyCollection<DisplayProfile> Profiles =
-            Array.AsReadOnly(
+            CreateAppa044Profiles(true);
+
+        // These exact one-descriptor profiles remain compiled only so an
+        // existing 48 Hz journal can still be verified and safely restored
+        // after an app update. New installs never select them.
+        private static readonly ReadOnlyCollection<DisplayProfile> LegacyProfiles =
+            CreateAppa044Profiles(false);
+
+        public static ReadOnlyCollection<DisplayProfile> All => Profiles;
+
+        private static ReadOnlyCollection<DisplayProfile> CreateAppa044Profiles(
+            bool include58Hz)
+        {
+            return Array.AsReadOnly(
                 new[]
                 {
                     CreateAppa044Profile(
-                        MacBookPro161Appa044ProfileId,
+                        include58Hz
+                            ? MacBookPro161Appa044EcoModesProfileId
+                            : MacBookPro161Appa044ProfileId,
                         "MacBook Pro 16-inch 2019 / APPA044",
                         "CDA0E18080DE8CAC744C66A5374A53CBBA1999115FA5FE2DBD949980649AF3F5",
                         "AMD Radeon Pro 5300M",
-                        "30.0.13045.22003"),
+                        "30.0.13045.22003",
+                        false,
+                        include58Hz),
                     CreateAppa044Profile(
-                        MacBookPro161Appa044Faf4ProfileId,
+                        include58Hz
+                            ? MacBookPro161Appa044Faf4EcoModesProfileId
+                            : MacBookPro161Appa044Faf4ProfileId,
                         "MacBook Pro 16-inch 2019 / APPA044 FAF4A9C1",
                         "FAF4A9C16A6B394896D75DAA3280D84A61744EA07ED2F7CC21E6CFBCF1B4D2DF",
                         "AMD Radeon Pro 5300M",
-                        string.Empty),
+                        string.Empty,
+                        include58Hz,
+                        include58Hz),
                     CreateAppa044Profile(
-                        MacBookPro161Appa0444b2eProfileId,
+                        include58Hz
+                            ? MacBookPro161Appa0444b2eEcoModesProfileId
+                            : MacBookPro161Appa0444b2eProfileId,
                         "MacBook Pro 16-inch 2019 / APPA044 4B2EA063",
                         "4B2EA0633F9C80C074E8F06E891B5F179444E0A417CD60AFBD190C732840B7EC",
                         "AMD Radeon Pro 5500M",
-                        "26.20.13003.5002")
+                        "26.20.13003.5002",
+                        include58Hz,
+                        include58Hz)
                 });
-
-        public static ReadOnlyCollection<DisplayProfile> All => Profiles;
+        }
 
         private static DisplayProfile CreateAppa044Profile(
             string id,
             string displayName,
             string normalizedEdidSignature,
             string verifiedGpuName,
-            string verifiedDriverVersion)
+            string verifiedDriverVersion,
+            bool experimental58Hz,
+            bool include58Hz)
         {
+            var modes = new List<DisplayRefreshMode>
+            {
+                new DisplayRefreshMode(
+                    48,
+                    Appa04448HzTiming,
+                    false)
+            };
+            if (include58Hz)
+            {
+                modes.Add(new DisplayRefreshMode(
+                    58,
+                    Appa04458HzTiming,
+                    experimental58Hz));
+            }
+
             return new DisplayProfile(
                 id,
                 displayName,
                 new[] { "MacBookPro16,1" },
                 "APPA044",
                 normalizedEdidSignature,
-                DetailedTiming.ParseHex(
-                    "E7 91 00 50 C0 80 37 70 08 20 98 08 59 D7 10 00 00 1A"),
-                DetailedTiming.ParseHex(
-                    "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A"),
+                NativeAppa044Timing,
+                modes.ToArray(),
                 verifiedGpuName,
                 "PCI\\VEN_1002&DEV_7340",
                 verifiedDriverVersion);
@@ -72,15 +132,83 @@ namespace MacBookEco.Core
                 return null;
             }
 
-            for (var index = 0; index < Profiles.Count; index++)
+            DisplayProfile profile = FindById(Profiles, profileId);
+            if (profile != null)
             {
-                if (
-                    string.Equals(
-                        Profiles[index].Id,
+                return profile;
+            }
+
+            return FindById(LegacyProfiles, profileId);
+        }
+
+        internal static bool ShouldRefreshInstalledProfile(
+            string installedProfileId,
+            string selectedProfileId)
+        {
+            return !string.IsNullOrWhiteSpace(installedProfileId) &&
+                !string.IsNullOrWhiteSpace(selectedProfileId) &&
+                !string.Equals(
+                    installedProfileId,
+                    selectedProfileId,
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static DisplayProfile FindExactInstalledProfile(
+            HardwareSnapshot hardware,
+            byte[] currentOverride,
+            int refreshRateHz)
+        {
+            if (hardware == null || currentOverride == null)
+            {
+                return null;
+            }
+
+            DisplayProfile profile = FindExactInstalledProfile(
+                Profiles,
+                hardware,
+                currentOverride,
+                refreshRateHz);
+            return profile ?? FindExactInstalledProfile(
+                LegacyProfiles,
+                hardware,
+                currentOverride,
+                refreshRateHz);
+        }
+
+        private static DisplayProfile FindExactInstalledProfile(
+            ReadOnlyCollection<DisplayProfile> profiles,
+            HardwareSnapshot hardware,
+            byte[] currentOverride,
+            int refreshRateHz)
+        {
+            for (var index = 0; index < profiles.Count; index++)
+            {
+                DisplayProfile profile = profiles[index];
+                if (profile.GetTargetMode(refreshRateHz) != null &&
+                    profile.Match(hardware).HardwareSupported &&
+                    FixedTimeComparer.AreEqual(
+                        currentOverride,
+                        profile.BuildOverride(hardware).ToByteArray()))
+                {
+                    return profile;
+                }
+            }
+
+            return null;
+        }
+
+        private static DisplayProfile FindById(
+            ReadOnlyCollection<DisplayProfile> profiles,
+            string profileId)
+        {
+            for (var index = 0; index < profiles.Count; index++)
+            {
+                if (string.Equals(
+                        profiles[index].Id,
                         profileId,
                         StringComparison.OrdinalIgnoreCase))
                 {
-                    return Profiles[index];
+                    return profiles[index];
                 }
             }
 
@@ -174,6 +302,10 @@ namespace MacBookEco.Core
                     ? freeDescriptor.ToString(CultureInfo.InvariantCulture)
                     : "None"));
             text.AppendLine(
+                "Free EDID descriptor count: "
+                + hardware.Edid.CountFreeDescriptors().ToString(
+                    CultureInfo.InvariantCulture));
+            text.AppendLine(
                 "GPU device: " + PublicGpuDevice(hardware.GpuDeviceId));
             text.AppendLine(
                 "Display driver: " + SafeVersion(hardware.DriverVersion));
@@ -183,6 +315,16 @@ namespace MacBookEco.Core
             text.AppendLine(
                 "Hardware supported: "
                 + (selection.HardwareSupported ? "True" : "False"));
+            DisplayRefreshMode mode58 = selection.Profile == null
+                ? null
+                : selection.Profile.GetTargetMode(58);
+            text.AppendLine(
+                "58 Hz validation: "
+                + (mode58 == null
+                    ? "Unavailable"
+                    : mode58.Experimental
+                        ? "Experimental"
+                        : "Hardware-verified"));
 
             AppendFindings(text, "Mismatch", closest == null
                 ? null

@@ -188,6 +188,114 @@ namespace MacBookEco.Core
             return -1;
         }
 
+        public int CountFreeDescriptors()
+        {
+            var count = 0;
+            for (var descriptorIndex = 1;
+                descriptorIndex < DescriptorCount;
+                descriptorIndex++)
+            {
+                if (IsFreeDescriptor(descriptorIndex))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Recovers an exact journaled base block from an EDID that Windows
+        /// still caches after an owned override was removed. MacBook Eco only
+        /// inserts detailed timings into non-preferred free descriptors, so
+        /// recovery enumerates those inverse edits and accepts exactly one
+        /// candidate whose full SHA-256 matches the protected original.
+        /// </summary>
+        public bool TryRecoverExactOriginal(
+            Sha256Digest expectedFingerprint,
+            out EdidBaseBlock original)
+        {
+            if (expectedFingerprint == null)
+            {
+                throw new ArgumentNullException(nameof(expectedFingerprint));
+            }
+
+            if (Sha256Digest.Compute(_bytes).Equals(expectedFingerprint))
+            {
+                original = new EdidBaseBlock(_bytes);
+                return true;
+            }
+
+            original = null;
+            var combinationCount = 1;
+            for (var index = 1; index < DescriptorCount; index++)
+            {
+                combinationCount *= 3;
+            }
+
+            for (var combination = 1;
+                combination < combinationCount;
+                combination++)
+            {
+                var candidate = (byte[])_bytes.Clone();
+                var choices = combination;
+                var valid = true;
+                for (var descriptorIndex = 1;
+                    descriptorIndex < DescriptorCount;
+                    descriptorIndex++)
+                {
+                    var choice = choices % 3;
+                    choices /= 3;
+                    if (choice == 0)
+                    {
+                        continue;
+                    }
+
+                    if (!IsDetailedTimingDescriptor(descriptorIndex))
+                    {
+                        valid = false;
+                        break;
+                    }
+
+                    var offset = GetDescriptorOffset(descriptorIndex);
+                    Array.Clear(
+                        candidate,
+                        offset,
+                        DetailedTiming.EncodedLength);
+                    if (choice == 2)
+                    {
+                        candidate[offset + 3] = 0x10;
+                    }
+                }
+
+                if (!valid)
+                {
+                    continue;
+                }
+
+                UpdateChecksum(candidate);
+                if (!Sha256Digest.Compute(candidate).Equals(
+                        expectedFingerprint))
+                {
+                    continue;
+                }
+
+                EdidBaseBlock recovered = new EdidBaseBlock(candidate);
+                if (original != null &&
+                    !FixedTimeComparer.AreEqual(
+                        original.ToByteArray(),
+                        recovered.ToByteArray()))
+                {
+                    original = null;
+                    return false;
+                }
+
+                original = recovered;
+            }
+
+            return original != null;
+        }
+
         public bool ContainsDetailedTiming(DetailedTiming timing)
         {
             if (timing == null)

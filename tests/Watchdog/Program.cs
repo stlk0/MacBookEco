@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -102,7 +103,7 @@ namespace MacBookEco.Tests.Watchdog
             try
             {
                 MonitorIdentity targetIdentity = CreateTargetIdentity();
-                DisplayModeKey originalMode = CreateOriginalMode();
+                DisplayModeKey originalMode = CreateOriginalMode(59);
                 DisplayWatchdogSessionState state =
                     DisplayWatchdogProtocol.CreateSession(
                         targetIdentity,
@@ -112,7 +113,10 @@ namespace MacBookEco.Tests.Watchdog
                 Check.That(
                     File.Exists(Path.Combine(testRoot, state.Token + ".session")),
                     "The watchdog session was not written to the isolated test root.");
-                AssertSessionContainsNoDisplayEndpoint(testRoot, state.Token);
+                AssertSessionContainsNoDisplayEndpoint(
+                    testRoot,
+                    state.Token,
+                    originalMode);
                 DisplayWatchdogSessionState roundTrip =
                     DisplayWatchdogProtocol.ReadSession(state.Token);
                 Check.That(roundTrip.Token == state.Token, "Token round-trip failed.");
@@ -295,23 +299,24 @@ namespace MacBookEco.Tests.Watchdog
                     "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"));
         }
 
-        private static DisplayModeKey CreateOriginalMode()
+        private static DisplayModeKey CreateOriginalMode(int refreshRate = 60)
         {
             return new DisplayModeKey(
                 3072,
                 1920,
                 32,
-                60,
+                refreshRate,
                 0,
                 0,
                 0,
-                60000,
-                1001);
+                refreshRate == 60 ? 60000U : (uint)refreshRate,
+                refreshRate == 60 ? 1001U : 1U);
         }
 
         private static void AssertSessionContainsNoDisplayEndpoint(
             string testRoot,
-            string token)
+            string token,
+            DisplayModeKey expectedMode)
         {
             string content = File.ReadAllText(
                 Path.Combine(testRoot, token + ".session"));
@@ -322,8 +327,18 @@ namespace MacBookEco.Tests.Watchdog
                 content.IndexOf(@"\\.\DISPLAY", StringComparison.OrdinalIgnoreCase) < 0,
                 "A watchdog session must not persist a DISPLAYn endpoint.");
             Check.That(
-                content.IndexOf("refreshNumerator=60000\n", StringComparison.Ordinal) >= 0
-                    && content.IndexOf("refreshDenominator=1001\n", StringComparison.Ordinal) >= 0,
+                content.IndexOf(
+                    "refreshNumerator=" +
+                    expectedMode.RefreshRateNumerator.ToString(
+                        CultureInfo.InvariantCulture) +
+                    "\n",
+                    StringComparison.Ordinal) >= 0 &&
+                content.IndexOf(
+                    "refreshDenominator=" +
+                    expectedMode.RefreshRateDenominator.ToString(
+                        CultureInfo.InvariantCulture) +
+                    "\n",
+                    StringComparison.Ordinal) >= 0,
                 "A watchdog session must persist the exact rational refresh.");
         }
 

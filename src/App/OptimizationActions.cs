@@ -68,7 +68,9 @@ namespace MacBookEco.App
             string displaySupportState,
             string displayProfileId,
             string detail,
-            bool display48HzAvailable = false)
+            bool display48HzAvailable = false,
+            bool display58HzAvailable = false,
+            bool display60HzAvailable = false)
         {
             Available = available;
             CpuProfileActive = cpuProfileActive;
@@ -78,6 +80,8 @@ namespace MacBookEco.App
             DisplayProfileId = displayProfileId ?? string.Empty;
             Detail = detail ?? string.Empty;
             Display48HzAvailable = display48HzAvailable;
+            Display58HzAvailable = display58HzAvailable;
+            Display60HzAvailable = display60HzAvailable;
         }
 
         public bool Available { get; private set; }
@@ -88,6 +92,8 @@ namespace MacBookEco.App
         public string DisplayProfileId { get; private set; }
         public string Detail { get; private set; }
         public bool Display48HzAvailable { get; private set; }
+        public bool Display58HzAvailable { get; private set; }
+        public bool Display60HzAvailable { get; private set; }
 
         public static OptimizationStateSnapshot Unavailable(string detail)
         {
@@ -109,7 +115,8 @@ namespace MacBookEco.App
     /// </summary>
     public static class DestructivePrompts
     {
-        public const string RemoveDisplaySupportTitle = "Remove 48 Hz support";
+        public const string RemoveDisplaySupportTitle =
+            "Remove Eco display support";
 
         public const string RemoveDisplaySupport =
             "Remove only the exact MacBook Eco-owned display override? "

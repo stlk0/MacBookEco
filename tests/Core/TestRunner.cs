@@ -49,6 +49,9 @@ namespace MacBookEco.Tests.Core
         private const string Exact48Dtd =
             "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A";
 
+        private const string Exact58Dtd =
+            "E7 91 00 50 C0 80 80 70 08 20 98 08 59 D7 10 00 00 1A";
+
         internal static TestCase[] CreateCases()
         {
             return new[]
@@ -57,11 +60,22 @@ namespace MacBookEco.Tests.Core
                     "Reviewed APPA044 fixture parses as exact native 60 Hz",
                     ParseOriginalEdid),
                 Test("Detailed timing round-trips byte for byte", DetailedTimingRoundTrip),
-                Test("Exact 48 Hz DTD is inserted without replacing native 60 Hz", InsertExact48),
+                Test(
+                    "Exact 48 and 58 Hz DTDs use both free slots",
+                    InsertExactEcoModes),
                 Test(
                     "Normalized signature is stable after managed insertion",
                     NormalizedSignature),
+                Test(
+                    "Exact journal fingerprint recovers a stale owned EDID",
+                    RecoverStaleOwnedEdid),
+                Test(
+                    "Legacy 48 Hz upgrade preserves the factory EDID",
+                    LegacyUpgradePreservesFactoryEdid),
                 Test("Known hardware selects the reviewed profile", KnownProfileMatches),
+                Test(
+                    "Legacy 48 Hz profile remains recovery-only",
+                    LegacyProfileRemainsRecoveryOnly),
                 Test(
                     "Alternate APPA044 EDID selects its exact profile",
                     AlternateAppa044ProfileMatches),
@@ -75,6 +89,9 @@ namespace MacBookEco.Tests.Core
                 Test(
                     "EDID recovery policy covers every durable retry boundary",
                     RecoveryPolicyMatrix),
+                Test(
+                    "Protected EDID journal recognizes exact historical bytes",
+                    ProtectedJournalOwnershipClassification),
                 Test(
                     "EDID journal transition matrix is exhaustive",
                     EdidTransitionMatrix),
@@ -139,6 +156,7 @@ namespace MacBookEco.Tests.Core
             Check.Near(373.51, native.PixelClockMegahertz, 0.001);
             Check.Near(59.999679, native.RefreshRateHertz, 0.00001);
             Check.Equal(2, edid.FindFreeDescriptor());
+            Check.Equal(2, edid.CountFreeDescriptors());
             Check.True(EdidBaseBlock.HasValidChecksum(edid.ToByteArray()));
         }
 
@@ -157,20 +175,37 @@ namespace MacBookEco.Tests.Core
             Check.Equal(499, target.VerticalBackPorch);
             Check.Near(373.40, target.PixelClockMegahertz, 0.001);
             Check.Near(48.000189, target.RefreshRateHertz, 0.00001);
+
+            var target58 = DetailedTiming.ParseHex(Exact58Dtd);
+            Check.Equal(3152, target58.HorizontalTotal);
+            Check.Equal(2048, target58.VerticalTotal);
+            Check.Equal(79, target58.VerticalBackPorch);
+            Check.Near(373.51, target58.PixelClockMegahertz, 0.001);
+            Check.Near(57.861018, target58.RefreshRateHertz, 0.00001);
         }
 
-        private static void InsertExact48()
+        private static void InsertExactEcoModes()
         {
             var original = CreateOriginal();
             var originalBytes = original.ToByteArray();
-            var target = DetailedTiming.ParseHex(Exact48Dtd);
-            var modified = original.InsertDetailedTiming(target);
+            var target48 = DetailedTiming.ParseHex(Exact48Dtd);
+            var target58 = DetailedTiming.ParseHex(Exact58Dtd);
+            var modified = original
+                .InsertDetailedTiming(target48)
+                .InsertDetailedTiming(target58);
 
             Check.BytesEqual(
                 original.PreferredTiming.ToByteArray(),
                 modified.PreferredTiming.ToByteArray());
-            Check.BytesEqual(target.ToByteArray(), modified.GetDetailedTiming(2).ToByteArray());
-            Check.True(modified.ContainsDetailedTiming(target));
+            Check.BytesEqual(
+                target48.ToByteArray(),
+                modified.GetDetailedTiming(2).ToByteArray());
+            Check.BytesEqual(
+                target58.ToByteArray(),
+                modified.GetDetailedTiming(3).ToByteArray());
+            Check.True(modified.ContainsDetailedTiming(target48));
+            Check.True(modified.ContainsDetailedTiming(target58));
+            Check.Equal(0, modified.CountFreeDescriptors());
             Check.True(EdidBaseBlock.HasValidChecksum(modified.ToByteArray()));
             Check.Equal(1, (int)modified.ExtensionBlockCount);
             Check.BytesEqual(originalBytes, original.ToByteArray());
@@ -178,7 +213,153 @@ namespace MacBookEco.Tests.Core
             // Insertion is deliberately idempotent for crash/retry recovery.
             Check.BytesEqual(
                 modified.ToByteArray(),
-                modified.InsertDetailedTiming(target).ToByteArray());
+                modified.InsertDetailedTiming(target48)
+                    .InsertDetailedTiming(target58)
+                    .ToByteArray());
+        }
+
+        private static void RecoverStaleOwnedEdid()
+        {
+            EdidBaseBlock original = CreateOriginal();
+            Sha256Digest originalFingerprint = Sha256Digest.Compute(
+                original.ToByteArray());
+            EdidBaseBlock stale59 = original.InsertDetailedTiming(
+                DetailedTiming.ParseHex(
+                    "C6 94 00 50 C0 80 80 70 08 20 98 08 59 D7 10 00 00 1A"));
+
+            EdidBaseBlock recovered;
+            Check.True(stale59.TryRecoverExactOriginal(
+                originalFingerprint,
+                out recovered));
+            Check.BytesEqual(
+                original.ToByteArray(),
+                recovered.ToByteArray());
+
+            EdidBaseBlock staleEco = original
+                .InsertDetailedTiming(DetailedTiming.ParseHex(Exact48Dtd))
+                .InsertDetailedTiming(DetailedTiming.ParseHex(Exact58Dtd));
+            Check.True(staleEco.TryRecoverExactOriginal(
+                originalFingerprint,
+                out recovered));
+            Check.BytesEqual(
+                original.ToByteArray(),
+                recovered.ToByteArray());
+
+            const string DeviceInstanceId =
+                "MONITOR\\APPA044\\STALE-OWNED-OVERRIDE";
+            ResolvedMonitorTarget target = CreateResolvedTarget(
+                DeviceInstanceId,
+                stale59);
+            MonitorIdentity identity = MonitorIdentity.FromExactBaseEdid(
+                DeviceInstanceId,
+                "APPA044",
+                original);
+            Check.False(target.MatchesIdentity(identity));
+            Check.True(target.MatchesIdentity(
+                identity,
+                Sha256Digest.Compute(staleEco.ToByteArray())));
+            Check.True(target.TryResolveOriginalBaseEdid(
+                identity,
+                out recovered));
+            Check.BytesEqual(
+                original.ToByteArray(),
+                recovered.ToByteArray());
+
+            byte[] foreignBytes = stale59.ToByteArray();
+            foreignBytes[24] ^= 0x01;
+            EdidBaseBlock.UpdateChecksum(foreignBytes);
+            Check.False(new EdidBaseBlock(foreignBytes)
+                .TryRecoverExactOriginal(
+                    originalFingerprint,
+                    out recovered));
+        }
+
+        private static void LegacyUpgradePreservesFactoryEdid()
+        {
+            EdidBaseBlock original = CreateOriginal();
+            HardwareSnapshot originalHardware = CreateKnownHardware(original);
+            DisplayProfile legacy = ProfileCatalog.GetById(
+                ProfileCatalog.MacBookPro161Appa044ProfileId);
+            EdidBaseBlock legacyEdid = legacy.BuildOverride(originalHardware);
+            HardwareSnapshot observedHardware = CreateKnownHardware(legacyEdid);
+
+            Check.True(ProfileCatalog.Select(observedHardware).CanInstall);
+
+            const string DeviceInstanceId =
+                "MONITOR\\APPA044\\LEGACY-48-UPGRADE";
+            ResolvedMonitorTarget legacyTarget = CreateResolvedTarget(
+                DeviceInstanceId,
+                legacyEdid);
+            MonitorIdentity factoryIdentity =
+                MonitorIdentity.FromExactBaseEdid(
+                    DeviceInstanceId,
+                    "APPA044",
+                    original);
+            EdidJournal previous = new EdidJournal(
+                JournalOperationId.NewId(),
+                new JournalGeneration(2),
+                new DateTime(2026, 8, 21, 12, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 8, 21, 12, 0, 0, DateTimeKind.Utc),
+                EdidJournalState.Restored,
+                new EdidJournalPayload(
+                    new EdidTargetIdentity(legacy.Id, factoryIdentity),
+                    Sha256Digest.Compute(legacyEdid.ToByteArray())));
+
+            Check.True(EdidRecoveryPolicy.RequiresOriginalForNewInstall(
+                previous.State));
+            Check.Equal(
+                EdidLiveOverrideState.Absent,
+                EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                    null,
+                    previous.Payload.OwnedOverrideHash));
+            EdidBaseBlock installEdid;
+            Check.True(legacyTarget.TryResolveOriginalBaseEdid(
+                previous.Payload.Target.Monitor,
+                out installEdid));
+            HardwareSnapshot installHardware = CreateKnownHardware(installEdid);
+            Check.BytesEqual(
+                original.ToByteArray(),
+                installHardware.Edid.ToByteArray());
+
+            DisplayProfile upgradedProfile =
+                ProfileCatalog.Select(installHardware).Profile;
+            EdidBaseBlock upgradedEdid = upgradedProfile.BuildOverride(
+                installHardware);
+            MonitorIdentity upgradedOriginalIdentity =
+                MonitorIdentity.FromExactBaseEdid(
+                    DeviceInstanceId,
+                    "APPA044",
+                    installHardware.Edid);
+            Check.Equal(
+                factoryIdentity.EdidFingerprint,
+                upgradedOriginalIdentity.EdidFingerprint);
+            EdidJournalPayload upgradedPayload = new EdidJournalPayload(
+                new EdidTargetIdentity(
+                    upgradedProfile.Id,
+                    upgradedOriginalIdentity),
+                Sha256Digest.Compute(upgradedEdid.ToByteArray()));
+            ResolvedMonitorTarget factoryTarget = CreateResolvedTarget(
+                DeviceInstanceId,
+                original);
+            Check.True(factoryTarget.MatchesIdentity(
+                upgradedPayload.Target.Monitor,
+                upgradedPayload.OwnedOverrideHash));
+            Check.Equal(
+                ManagedResourceState.Restored,
+                EdidStatusReader.ClassifyTerminalState(
+                    EdidJournalState.Restored,
+                    EdidLiveOverrideState.Absent));
+        }
+
+        private static ResolvedMonitorTarget CreateResolvedTarget(
+            string deviceInstanceId,
+            EdidBaseBlock edid)
+        {
+            MonitorDeviceRecord record = new MonitorDeviceRecord();
+            record.DeviceInstanceId = deviceInstanceId;
+            record.HardwareId = "MONITOR\\APPA044";
+            record.Edid = edid.ToByteArray();
+            return ResolvedMonitorTarget.FromRecord(record, null, 0, 0);
         }
 
         private static void NormalizedSignature()
@@ -256,13 +437,23 @@ namespace MacBookEco.Tests.Core
             Check.True(selected.HardwareSupported);
             Check.NotNull(selected.Profile);
             Check.Equal(
-                ProfileCatalog.MacBookPro161Appa044ProfileId,
+                ProfileCatalog.MacBookPro161Appa044EcoModesProfileId,
                 selected.Profile.Id);
             Check.Equal(0, selected.ClosestMatch.RejectionReasons.Count);
             Check.Equal(0, selected.ClosestMatch.Warnings.Count);
 
             var installed = selected.Profile.BuildOverride(hardware);
-            Check.True(installed.ContainsDetailedTiming(selected.Profile.TargetTiming));
+            Check.True(installed.ContainsDetailedTiming(
+                selected.Profile.GetTargetMode(48).Timing));
+            Check.True(installed.ContainsDetailedTiming(
+                selected.Profile.GetTargetMode(58).Timing));
+            Check.False(selected.Profile.GetTargetMode(58).Experimental);
+            Check.Equal(
+                selected.Profile,
+                ProfileCatalog.FindExactInstalledProfile(
+                    hardware,
+                    installed.ToByteArray(),
+                    58));
 
             var otherDriver = new HardwareSnapshot(
                 "Apple Inc.",
@@ -288,7 +479,7 @@ namespace MacBookEco.Tests.Core
             Check.True(selected.HardwareSupported);
             Check.NotNull(selected.Profile);
             Check.Equal(
-                ProfileCatalog.MacBookPro161Appa044Faf4ProfileId,
+                ProfileCatalog.MacBookPro161Appa044Faf4EcoModesProfileId,
                 selected.Profile.Id);
             Check.Equal(
                 Sha256Digest.ParseCanonical(
@@ -297,7 +488,37 @@ namespace MacBookEco.Tests.Core
                 edid.NormalizedSignature);
             Check.True(
                 selected.Profile.BuildOverride(hardware)
-                    .ContainsDetailedTiming(selected.Profile.TargetTiming));
+                    .ContainsDetailedTiming(
+                        selected.Profile.GetTargetMode(58).Timing));
+            Check.True(selected.Profile.GetTargetMode(58).Experimental);
+        }
+
+        private static void LegacyProfileRemainsRecoveryOnly()
+        {
+            HardwareSnapshot hardware = CreateKnownHardware(CreateOriginal());
+            DisplayProfile legacy = ProfileCatalog.GetById(
+                ProfileCatalog.MacBookPro161Appa044ProfileId);
+
+            Check.NotNull(legacy);
+            Check.NotNull(legacy.GetTargetMode(48));
+            Check.True(legacy.GetTargetMode(58) == null);
+            Check.Equal(
+                ProfileCatalog.MacBookPro161Appa044EcoModesProfileId,
+                ProfileCatalog.Select(hardware).Profile.Id);
+            Check.Equal(
+                1,
+                legacy.BuildOverride(hardware).CountFreeDescriptors());
+            byte[] legacyOverride = legacy.BuildOverride(hardware).ToByteArray();
+            Check.Equal(
+                legacy,
+                ProfileCatalog.FindExactInstalledProfile(
+                    hardware,
+                    legacyOverride,
+                    48));
+            Check.True(ProfileCatalog.FindExactInstalledProfile(
+                hardware,
+                legacyOverride,
+                58) == null);
         }
 
         private static void Radeon5500Appa044ProfileMatches()
@@ -318,7 +539,7 @@ namespace MacBookEco.Tests.Core
             Check.True(selected.HardwareSupported);
             Check.NotNull(selected.Profile);
             Check.Equal(
-                ProfileCatalog.MacBookPro161Appa0444b2eProfileId,
+                ProfileCatalog.MacBookPro161Appa0444b2eEcoModesProfileId,
                 selected.Profile.Id);
             Check.Equal(
                 Sha256Digest.ParseCanonical(
@@ -329,7 +550,9 @@ namespace MacBookEco.Tests.Core
             Check.Equal(0, selected.ClosestMatch.Warnings.Count);
             Check.True(
                 selected.Profile.BuildOverride(hardware)
-                    .ContainsDetailedTiming(selected.Profile.TargetTiming));
+                    .ContainsDetailedTiming(
+                        selected.Profile.GetTargetMode(58).Timing));
+            Check.True(selected.Profile.GetTargetMode(58).Experimental);
         }
 
         private static void UnknownProfileRejected()
@@ -405,6 +628,19 @@ namespace MacBookEco.Tests.Core
 
         private static void CapabilitySplit()
         {
+            var oneSlotBytes = CreateOriginal().ToByteArray();
+            SetOccupiedMonitorDescriptor(oneSlotBytes, 3, 0xFD);
+            EdidBaseBlock.UpdateChecksum(oneSlotBytes);
+            HardwareSnapshot oneSlotHardware = CreateKnownHardware(
+                new EdidBaseBlock(oneSlotBytes));
+            ProfileSelectionResult currentSelection = ProfileCatalog.Select(
+                oneSlotHardware);
+            Check.True(currentSelection.HardwareSupported);
+            Check.False(currentSelection.CanInstall);
+            Check.True(ProfileCatalog.GetById(
+                    ProfileCatalog.MacBookPro161Appa044ProfileId)
+                .Match(oneSlotHardware).CanInstall);
+
             var occupiedBytes = CreateOriginal().ToByteArray();
             SetOccupiedMonitorDescriptor(occupiedBytes, 2, 0xFC);
             SetOccupiedMonitorDescriptor(occupiedBytes, 3, 0xFD);
@@ -617,6 +853,47 @@ namespace MacBookEco.Tests.Core
             }
         }
 
+        private static void ProtectedJournalOwnershipClassification()
+        {
+            byte[] ownedOverride = new byte[EdidBaseBlock.Length];
+            for (var index = 0; index < ownedOverride.Length; index++)
+            {
+                ownedOverride[index] = (byte)index;
+            }
+
+            Sha256Digest ownedHash = Sha256Digest.Compute(ownedOverride);
+            Check.Equal(
+                EdidLiveOverrideState.ExactOwned,
+                EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                    ownedOverride,
+                    ownedHash));
+            Check.Equal(
+                EdidLiveOverrideState.Absent,
+                EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                    null,
+                    ownedHash));
+
+            byte[] modifiedOverride = (byte[])ownedOverride.Clone();
+            modifiedOverride[64] ^= 1;
+            Check.Equal(
+                EdidLiveOverrideState.ForeignOrInvalid,
+                EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                    modifiedOverride,
+                    ownedHash));
+            Check.Equal(
+                EdidLiveOverrideState.ForeignOrInvalid,
+                EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                    new byte[EdidBaseBlock.Length - 1],
+                    ownedHash));
+            Check.Throws<ArgumentNullException>(
+                delegate
+                {
+                    EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                        ownedOverride,
+                        null);
+                });
+        }
+
         private static void RecoveryPolicyRejectsUnknownInputs()
         {
             Check.Throws<ArgumentOutOfRangeException>(
@@ -655,6 +932,18 @@ namespace MacBookEco.Tests.Core
 
         private static void RefreshOnlyModeSelectionPreservesCurrentKey()
         {
+            Check.True(DisplayModeSelectionPolicy.IsReviewedRefreshRate(48));
+            Check.True(DisplayModeSelectionPolicy.IsReviewedRefreshRate(58));
+            Check.True(DisplayModeSelectionPolicy.IsReviewedRefreshRate(60));
+            Check.False(DisplayModeSelectionPolicy.IsReviewedRefreshRate(59));
+            Check.True(DisplayModeSelectionPolicy.IsEcoRefreshRate(48));
+            Check.True(DisplayModeSelectionPolicy.IsEcoRefreshRate(58));
+            Check.False(DisplayModeSelectionPolicy.IsEcoRefreshRate(60));
+            Check.True(
+                DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(59));
+            Check.True(
+                DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(61));
+
             var current = new DisplayModeKey(
                 3072,
                 1920,

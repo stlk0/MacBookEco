@@ -24,9 +24,11 @@ namespace MacBookEco.App
         private bool _synchronizingSelections;
         private bool _profileSelectionDirty;
         private bool _cpuSelectionDirty;
+        private bool _displaySelectionDirty;
         private bool _mutationControlsEnabled = true;
-        private bool? _last48Active;
-        private bool? _last60Active;
+        private bool? _lastShow48Hz;
+        private bool? _lastShow58Hz;
+        private bool? _lastShow60Hz;
 
         public DashboardProfilesController(object customProfileItem)
         {
@@ -47,7 +49,6 @@ namespace MacBookEco.App
 
             _page = page;
             ApplyDisplaySupportPresentation();
-            UpdateRecommendedApplyEnabled();
         }
 
         public void UpdateDisplay(DisplayTelemetry display)
@@ -69,6 +70,10 @@ namespace MacBookEco.App
                 StringComparison.Ordinal))
             {
                 _page.DisplayCurrent.Text = currentModeText;
+            }
+            if (!_displaySelectionDirty && _display.RefreshRateHz.HasValue)
+            {
+                SelectDisplayMode((int)Math.Round(_display.RefreshRateHz.Value));
             }
             ApplyDisplaySupportPresentation();
             UpdateCombinedProfileState();
@@ -132,6 +137,17 @@ namespace MacBookEco.App
         {
             _profileSelectionDirty = false;
             _cpuSelectionDirty = false;
+            _displaySelectionDirty = false;
+        }
+
+        public int? SelectedDisplayRefreshRate()
+        {
+            DisplayModeChoice selected = _page == null
+                ? null
+                : _page.DisplayMode.SelectedItem as DisplayModeChoice;
+            return selected == null
+                ? (int?)null
+                : selected.RefreshRateHz;
         }
 
         public PowerPreset? SelectedCpuPreset()
@@ -170,7 +186,6 @@ namespace MacBookEco.App
             ApplyDisplaySupportPresentation();
             _page.CpuApplyButton.Enabled = enabled;
             _page.CpuRestoreButton.Enabled = enabled;
-            UpdateRecommendedApplyEnabled();
             _page.CpuPreset.Enabled = enabled;
             _page.RecommendedProfile.Enabled = enabled;
         }
@@ -236,6 +251,16 @@ namespace MacBookEco.App
             }
         }
 
+        public void OnDisplayModeChanged(object sender, EventArgs eventArgs)
+        {
+            if (!_synchronizingSelections)
+            {
+                _displaySelectionDirty = true;
+            }
+
+            ApplyDisplaySupportPresentation();
+        }
+
         private void SelectCpuPreset(PowerPreset preset)
         {
             for (int index = 0; index < _page.CpuPreset.Items.Count; index++)
@@ -289,22 +314,18 @@ namespace MacBookEco.App
                 return;
             }
 
-            DisplaySupportUiState displayState = DisplaySupportUiPolicy.Evaluate(
-                _optimizationState,
-                _display.IsRefreshRate(48.0),
-                _mutationControlsEnabled);
-            SetDisplayButtonState(
-                _page.Display48Button,
-                "48 Hz Eco",
-                _display.IsRefreshRate(48.0),
-                displayState.CanSelect48Hz,
-                ref _last48Active);
-            SetDisplayButtonState(
-                _page.Display60Button,
-                "60 Hz Native",
-                _display.IsRefreshRate(60.0),
-                displayState.CanSelect60Hz,
-                ref _last60Active);
+            DisplaySupportUiState displayState = CurrentDisplaySupport();
+            UpdateDisplayModeChoices(displayState);
+            int? selectedRefreshRate = SelectedDisplayRefreshRate();
+            bool canApply = selectedRefreshRate == 48
+                ? displayState.CanSelect48Hz
+                : selectedRefreshRate == 58
+                    ? displayState.CanSelect58Hz
+                    : selectedRefreshRate == 60 && displayState.CanSelect60Hz;
+            _page.DisplayMode.Enabled = _mutationControlsEnabled &&
+                _page.DisplayMode.Items.Count > 0;
+            _page.DisplayApplyButton.Enabled = canApply &&
+                !_display.IsRefreshRate(selectedRefreshRate ?? 0);
             if (!string.Equals(
                 _page.DisplayState.Text,
                 displayState.SupportText,
@@ -323,8 +344,8 @@ namespace MacBookEco.App
 
             _page.InstallDisplayButton.AccessibleDescription =
                 displayState.CanInstall
-                    ? "Install or repair MacBook Eco 48 Hz support"
-                    : "48 Hz support cannot be installed in the current state";
+                    ? "Install, refresh, or repair MacBook Eco display support"
+                    : "Eco display support cannot be changed in the current state";
             if (_page.InstallDisplayButton.Enabled != displayState.CanInstall)
             {
                 _page.InstallDisplayButton.Enabled = displayState.CanInstall;
@@ -337,30 +358,29 @@ namespace MacBookEco.App
 
             _page.RemoveDisplayButton.AccessibleDescription =
                 displayState.CanRemove
-                    ? "Remove MacBook Eco-owned 48 Hz support"
-                    : "No MacBook Eco-owned 48 Hz support can be removed";
+                    ? "Remove MacBook Eco-owned display support"
+                    : "No MacBook Eco-owned display support can be removed";
             if (_page.RemoveDisplayButton.Enabled != displayState.CanRemove)
             {
                 _page.RemoveDisplayButton.Enabled = displayState.CanRemove;
             }
 
-            UpdateRecommendedApplyEnabled();
+            UpdateRecommendedApplyEnabled(displayState);
         }
 
-        private void UpdateRecommendedApplyEnabled()
+        private void UpdateRecommendedApplyEnabled(
+            DisplaySupportUiState displayState = null)
         {
             if (_page == null)
             {
                 return;
             }
 
+            displayState = displayState ?? CurrentDisplaySupport();
             OptimizationProfileDefinition profile = SelectedRecommendedProfile();
             bool canUseProfileDisplay = profile == null
                 || profile.DisplayRefreshRate != 48
-                || DisplaySupportUiPolicy.Evaluate(
-                    _optimizationState,
-                    _display.IsRefreshRate(48.0),
-                    _mutationControlsEnabled).CanSelect48Hz;
+                || displayState.CanSelect48Hz;
             _page.ApplyRecommendedButton.Enabled = _mutationControlsEnabled
                 && profile != null
                 && canUseProfileDisplay;
@@ -454,54 +474,88 @@ namespace MacBookEco.App
             }
         }
 
-        private static void SetDisplayButtonState(
-            Button button,
-            string label,
-            bool active,
-            bool enabled,
-            ref bool? previousActive)
+        private void SelectDisplayMode(int refreshRateHz)
         {
-            if (!string.Equals(button.Text, label, StringComparison.Ordinal))
+            for (var index = 0; index < _page.DisplayMode.Items.Count; index++)
             {
-                button.Text = label;
-            }
-
-            string description = active
-                ? "Current display refresh mode"
-                : (enabled
-                    ? "Switch display refresh mode"
-                    : "This display mode is not available in the current state");
-            if (!string.Equals(
-                button.AccessibleDescription,
-                description,
-                StringComparison.Ordinal))
-            {
-                button.AccessibleDescription = description;
-            }
-
-            if (!previousActive.HasValue || previousActive.Value != active)
-            {
-                Size minimumSize = button.MinimumSize;
-                if (active)
+                DisplayModeChoice choice =
+                    _page.DisplayMode.Items[index] as DisplayModeChoice;
+                if (choice != null && choice.RefreshRateHz == refreshRateHz)
                 {
-                    DashboardTheme.StylePrimaryButton(button);
-                }
-                else
-                {
-                    DashboardTheme.StyleSecondaryButton(button);
-                }
+                    _synchronizingSelections = true;
+                    try
+                    {
+                        _page.DisplayMode.SelectedIndex = index;
+                    }
+                    finally
+                    {
+                        _synchronizingSelections = false;
+                    }
 
-                // The button may already have been DPI-scaled when telemetry
-                // changes its palette. Restyling must not replace that scaled
-                // minimum with the theme's unscaled design-time default.
-                button.MinimumSize = minimumSize;
-                button.AutoSize = true;
-                previousActive = active;
+                    return;
+                }
+            }
+        }
+
+        private DisplaySupportUiState CurrentDisplaySupport()
+        {
+            return DisplaySupportUiPolicy.Evaluate(
+                _optimizationState,
+                _display.IsRefreshRate(48.0),
+                _display.IsRefreshRate(58.0),
+                _display.IsRefreshRate(60.0),
+                _mutationControlsEnabled);
+        }
+
+        private void UpdateDisplayModeChoices(DisplaySupportUiState state)
+        {
+            if (_lastShow48Hz == state.Show48Hz &&
+                _lastShow58Hz == state.Show58Hz &&
+                _lastShow60Hz == state.Show60Hz)
+            {
+                return;
             }
 
-            if (button.Enabled != enabled)
+            _lastShow48Hz = state.Show48Hz;
+            _lastShow58Hz = state.Show58Hz;
+            _lastShow60Hz = state.Show60Hz;
+            int? selected = SelectedDisplayRefreshRate();
+
+            _synchronizingSelections = true;
+            try
             {
-                button.Enabled = enabled;
+                _page.DisplayMode.Items.Clear();
+                if (state.Show48Hz)
+                {
+                    _page.DisplayMode.Items.Add(
+                        new DisplayModeChoice(48, "48 Hz"));
+                }
+
+                if (state.Show58Hz)
+                {
+                    _page.DisplayMode.Items.Add(
+                        new DisplayModeChoice(58, "58 Hz"));
+                }
+
+                if (state.Show60Hz)
+                {
+                    _page.DisplayMode.Items.Add(
+                        new DisplayModeChoice(60, "60 Hz Native"));
+                }
+            }
+            finally
+            {
+                _synchronizingSelections = false;
+            }
+
+            if (!selected.HasValue && _display.RefreshRateHz.HasValue)
+            {
+                selected = (int)Math.Round(_display.RefreshRateHz.Value);
+            }
+
+            if (selected.HasValue)
+            {
+                SelectDisplayMode(selected.Value);
             }
         }
 

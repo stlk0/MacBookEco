@@ -100,9 +100,6 @@ namespace MacBookEco.Platform.Windows
 
                 DisplayProfile profile = ProfileCatalog.GetById(
                     journal.Payload.Target.ProfileId);
-                if (profile == null)
-                    return ManagedResourceState.Conflict;
-
                 ResolvedMonitorTarget target =
                     _targetResolver.ResolveStoredForRestore(
                         journal.Payload.Target.Monitor,
@@ -112,20 +109,38 @@ namespace MacBookEco.Platform.Windows
                         journal.Payload.OwnedOverrideHash))
                     return ManagedResourceState.Conflict;
 
-                EdidBaseBlock baseEdid = new EdidBaseBlock(target.BaseEdid);
+                if (profile == null)
+                {
+                    return ClassifyTerminalState(
+                        journal.State,
+                        EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                            target.ReadOverride(),
+                            journal.Payload.OwnedOverrideHash));
+                }
+
+                EdidBaseBlock originalEdid;
+                if (!target.TryResolveOriginalBaseEdid(
+                        journal.Payload.Target.Monitor,
+                        out originalEdid))
+                {
+                    return ManagedResourceState.Conflict;
+                }
+
                 if (!string.Equals(
                         profile.PanelHardwareId,
                         target.HardwareId,
                         StringComparison.Ordinal) ||
                     !profile.NormalizedEdidSignature.Equals(
-                        baseEdid.NormalizedSignature) ||
-                    !profile.NativeTiming.Equals(baseEdid.PreferredTiming))
+                        originalEdid.NormalizedSignature) ||
+                    !profile.NativeTiming.Equals(originalEdid.PreferredTiming))
                 {
                     return ManagedResourceState.Conflict;
                 }
 
-                byte[] expected = baseEdid.InsertDetailedTiming(
-                    profile.TargetTiming).ToByteArray();
+                byte[] expected = target.BaseEdidHash.Equals(
+                    journal.Payload.OwnedOverrideHash)
+                        ? target.BaseEdid
+                        : profile.BuildOverride(originalEdid).ToByteArray();
                 if (!Sha256Digest.Compute(expected).Equals(
                         journal.Payload.OwnedOverrideHash))
                 {

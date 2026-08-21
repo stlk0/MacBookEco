@@ -25,6 +25,8 @@ namespace MacBookEco.Platform.Windows
         internal const int ERROR_FILE_NOT_FOUND = 2;
 
         internal const uint QDC_ONLY_ACTIVE_PATHS = 0x00000002;
+        internal const uint DISPLAYCONFIG_MODE_INFO_TYPE_TARGET = 2;
+        internal const uint DISPLAYCONFIG_PATH_SUPPORT_VIRTUAL_MODE = 0x00000008;
 
         internal const uint DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME = 1;
         internal const uint DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME = 2;

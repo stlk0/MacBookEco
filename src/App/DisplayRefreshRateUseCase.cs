@@ -6,7 +6,7 @@ using MacBookEco.Platform.Windows;
 namespace MacBookEco.App
 {
     /// <summary>
-    /// Executes the reversible, watchdog-backed 48/60 Hz mode transition.
+    /// Executes reversible, watchdog-backed 48/58/60 Hz mode transitions.
     /// </summary>
     internal sealed class DisplayRefreshRateUseCase
     {
@@ -59,11 +59,11 @@ namespace MacBookEco.App
             Func<DisplayModeConfirmationRequest, DisplayModeConfirmationDecision>
                 confirmation)
         {
-            if (refreshRateHz != 48 && refreshRateHz != 60)
+            if (!DisplayModeSelectionPolicy.IsReviewedRefreshRate(refreshRateHz))
             {
                 return OptimizationActionResult.Unsupported(
                     OperationCode.InvalidRequest,
-                    "Only the reviewed 48 Hz and native 60 Hz modes are allowed.");
+                    "Only the reviewed 48/58 Hz and native 60 Hz modes are allowed.");
             }
 
             try
@@ -82,12 +82,13 @@ namespace MacBookEco.App
                     displayTarget.RefreshRateNumerator,
                     displayTarget.RefreshRateDenominator);
                 DisplayModeKey originalModeKey = originalMode.Key;
-                if (originalMode.RefreshRate != 48 && originalMode.RefreshRate != 60)
+                if (!DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(
+                        originalMode.RefreshRate))
                 {
                     return OptimizationActionResult.Unsupported(
                         OperationCode.UnsupportedCapability,
-                        "The current refresh rate is not a reviewed 48/60 Hz "
-                        + "watchdog recovery target.");
+                        "The current refresh rate is not a supported watchdog "
+                        + "recovery target.");
                 }
 
                 if (originalMode.RefreshRate == refreshRateHz)
@@ -106,10 +107,10 @@ namespace MacBookEco.App
                 {
                     return OptimizationActionResult.Unsupported(
                         OperationCode.UnsupportedCapability,
-                        refreshRateHz == 48
-                            ? "Windows has not exposed the 48 Hz mode yet. "
+                        DisplayModeSelectionPolicy.IsEcoRefreshRate(refreshRateHz)
+                            ? "Windows has not exposed the requested Eco mode yet. "
                                 + "Restart Windows after installing or repairing "
-                                + "48 Hz support."
+                                + "Eco display support."
                             : "Windows has not exposed an exact native 60 Hz "
                                 + "recovery mode for the current display settings.");
                 }
@@ -146,6 +147,11 @@ namespace MacBookEco.App
                                 return _validator.ResolveActive(
                                     displayTarget.Identity).Endpoint.GdiDeviceName;
                             });
+                        if (refreshRateHz == 58)
+                        {
+                            Verify58HzSignal(displayTarget.Identity);
+                        }
+
                         DisplayModeConfirmationDecision decision =
                             confirmation == null
                                 ? DisplayModeConfirmationDecision.Revert
@@ -219,7 +225,8 @@ namespace MacBookEco.App
                             delegate
                             {
                                 return ReadCurrentModeForTarget(
-                                    displayTarget.Identity);
+                                    displayTarget.Identity,
+                                    refreshRateHz == 58);
                             },
                             delegate
                             {
@@ -259,18 +266,23 @@ namespace MacBookEco.App
             }
         }
 
-        internal bool Is48HzModeAvailable()
+        internal bool IsRefreshRateModeAvailable(int refreshRateHz)
         {
+            if (!DisplayModeSelectionPolicy.IsReviewedRefreshRate(refreshRateHz))
+            {
+                return false;
+            }
+
             try
             {
                 StableDisplayTarget displayTarget;
                 OptimizationActionResult validation = _validator.Validate(
-                    48,
+                    refreshRateHz,
                     out displayTarget);
                 return validation == null
                     && _displayModes.IsExactRefreshOnlyModeAvailable(
                         displayTarget.Endpoint.GdiDeviceName,
-                        48);
+                        refreshRateHz);
             }
             catch (Exception)
             {
@@ -289,11 +301,57 @@ namespace MacBookEco.App
         private WindowsDisplayMode ReadCurrentModeForTarget(
             MonitorIdentity identity)
         {
+            return ReadCurrentModeForTarget(identity, false);
+        }
+
+        private WindowsDisplayMode ReadCurrentModeForTarget(
+            MonitorIdentity identity,
+            bool verify58HzSignal)
+        {
             StableDisplayTarget target = _validator.ResolveActive(identity);
+            if (verify58HzSignal)
+            {
+                Verify58HzSignal(target);
+            }
+
             return _displayModes.GetCurrentMode(
                 target.Endpoint.GdiDeviceName,
                 target.RefreshRateNumerator,
                 target.RefreshRateDenominator);
+        }
+
+        private void Verify58HzSignal(MonitorIdentity identity)
+        {
+            Verify58HzSignal(_validator.ResolveActive(identity));
+        }
+
+        private static void Verify58HzSignal(StableDisplayTarget target)
+        {
+            if (target == null ||
+                !IsExpected58HzSignal(
+                    target.PixelRate,
+                    target.ActiveWidth,
+                    target.ActiveHeight,
+                    target.TotalWidth,
+                    target.TotalHeight))
+            {
+                throw new InvalidOperationException(
+                    "Windows did not read back the exact reviewed 58 Hz signal timing.");
+            }
+        }
+
+        internal static bool IsExpected58HzSignal(
+            ulong pixelRate,
+            uint activeWidth,
+            uint activeHeight,
+            uint totalWidth,
+            uint totalHeight)
+        {
+            return pixelRate == 373510000UL &&
+                activeWidth == 3072U &&
+                activeHeight == 1920U &&
+                totalWidth == 3152U &&
+                totalHeight == 2048U;
         }
 
         private static DisplayModeKey CreateRefreshOnlyTarget(

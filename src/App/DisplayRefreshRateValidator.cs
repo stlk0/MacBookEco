@@ -79,40 +79,34 @@ namespace MacBookEco.App
                     exception.Message);
             }
 
-            // Native 60 Hz is a recovery action. Entering 48 Hz additionally
-            // requires exact reviewed override bytes for this panel.
-            if (refreshRateHz == 48)
+            // Native 60 Hz is a recovery action. Entering either Eco mode
+            // additionally requires exact compiled override bytes for this
+            // panel. This accepts the recovery-only legacy profile for 48 Hz
+            // but never treats it as authorization for 58 Hz.
+            if (DisplayModeSelectionPolicy.IsEcoRefreshRate(refreshRateHz))
             {
                 try
                 {
                     HardwareSnapshot coreHardware = hardware.ToCoreSnapshot();
-                    ProfileSelectionResult selection =
-                        ProfileCatalog.Select(coreHardware);
-                    if (!selection.HardwareSupported)
-                    {
-                        return OptimizationActionResult.Unsupported(
-                            OperationCode.UnsupportedCapability,
-                            "No reviewed 48 Hz profile matches this Mac and panel.");
-                    }
-
                     byte[] currentOverride =
                         hardware.InternalDisplay.ExistingEdidOverride;
-                    byte[] reviewedOverride = selection.Profile
-                        .BuildOverride(coreHardware)
-                        .ToByteArray();
-                    if (!FixedTimeComparer.AreEqual(currentOverride, reviewedOverride))
+                    DisplayProfile profile = ProfileCatalog.FindExactInstalledProfile(
+                        coreHardware,
+                        currentOverride,
+                        refreshRateHz);
+                    if (profile == null)
                     {
                         return OptimizationActionResult.Unsupported(
                             OperationCode.UnsupportedCapability,
-                            "The installed display override is absent or does not "
-                                + "match the reviewed 48 Hz profile.");
+                            "No exact installed Eco display profile matches this "
+                                + "Mac, panel, and requested refresh rate.");
                     }
                 }
                 catch (Exception exception)
                 {
                     return OptimizationActionResult.Failed(
                         OperationCode.ReadBackFailed,
-                        "The reviewed 48 Hz profile could not be verified: "
+                        "The installed Eco display profile could not be verified: "
                             + exception.Message,
                         exception.Message);
                 }

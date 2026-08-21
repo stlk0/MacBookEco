@@ -525,12 +525,13 @@ namespace MacBookEco.DisplaySafety
             if (originalMode.Width <= 0
                 || originalMode.Height <= 0
                 || originalMode.BitsPerPixel <= 0
-                || (originalMode.RefreshRate != 48 && originalMode.RefreshRate != 60)
+                || !DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(
+                    originalMode.RefreshRate)
                 || originalMode.RefreshRateNumerator == 0
                 || originalMode.RefreshRateDenominator == 0)
             {
                 throw new ArgumentException(
-                    "A complete reviewed 48/60 Hz display mode key is required.",
+                    "A complete supported display recovery mode key is required.",
                     nameof(originalMode));
             }
         }
