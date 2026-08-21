@@ -26,7 +26,6 @@ namespace MacBookEco.App
         private bool _cpuSelectionDirty;
         private bool _displaySelectionDirty;
         private bool _mutationControlsEnabled = true;
-        private string _last58Text;
         private bool? _lastShow48Hz;
         private bool? _lastShow58Hz;
         private bool? _lastShow60Hz;
@@ -510,18 +509,13 @@ namespace MacBookEco.App
 
         private void UpdateDisplayModeChoices(DisplaySupportUiState state)
         {
-            if (string.Equals(
-                    _last58Text,
-                    state.Mode58Text,
-                    StringComparison.Ordinal) &&
-                _lastShow48Hz == state.Show48Hz &&
+            if (_lastShow48Hz == state.Show48Hz &&
                 _lastShow58Hz == state.Show58Hz &&
                 _lastShow60Hz == state.Show60Hz)
             {
                 return;
             }
 
-            _last58Text = state.Mode58Text;
             _lastShow48Hz = state.Show48Hz;
             _lastShow58Hz = state.Show58Hz;
             _lastShow60Hz = state.Show60Hz;
@@ -534,14 +528,13 @@ namespace MacBookEco.App
                 if (state.Show48Hz)
                 {
                     _page.DisplayMode.Items.Add(
-                        new DisplayModeChoice(48, "48 Hz Eco"));
+                        new DisplayModeChoice(48, "48 Hz"));
                 }
 
                 if (state.Show58Hz)
                 {
-                    _page.DisplayMode.Items.Add(new DisplayModeChoice(
-                        58,
-                        state.Mode58Text));
+                    _page.DisplayMode.Items.Add(
+                        new DisplayModeChoice(58, "58 Hz"));
                 }
 
                 if (state.Show60Hz)

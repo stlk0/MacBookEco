@@ -184,25 +184,17 @@ namespace MacBookEco.App
 
         internal static OptimizationActionResult HelperFailure(int exitCode)
         {
-            string diagnosticReason =
-                AdminHelperExitCodes.DiagnosticReason(exitCode);
-            string description = DescribeExitCode(exitCode) +
-                DescribeDiagnosticReason(exitCode, diagnosticReason);
+            string description = DescribeExitCode(exitCode);
             string detail = "helper-exit=" + exitCode;
-            if (diagnosticReason != null)
-            {
-                detail += ";helper-reason=" + diagnosticReason;
-            }
 
             if (exitCode == AdminHelperExitCodes.Unsupported)
             {
                 return OptimizationActionResult.Unsupported(
                     OperationCode.HelperUnsupported,
-                    description,
-                    detail);
+                    description);
             }
 
-            if (AdminHelperExitCodes.IsIndeterminate(exitCode))
+            if (exitCode == AdminHelperExitCodes.Indeterminate)
             {
                 return OptimizationActionResult.Indeterminate(
                     OperationCode.HelperIndeterminate,
@@ -220,20 +212,6 @@ namespace MacBookEco.App
 
         private static string DescribeExitCode(int exitCode)
         {
-            if (AdminHelperExitCodes.IsIndeterminate(exitCode))
-            {
-                return "The helper reached an indeterminate transaction boundary. "
-                    + "Recovery must reconcile the durable journal before another "
-                    + "privileged change.";
-            }
-
-            if (AdminHelperExitCodes.DiagnosticReason(exitCode) != null &&
-                exitCode != AdminHelperExitCodes.Unsupported)
-            {
-                return "The helper could not complete the requested transaction. "
-                    + "No unverified change is treated as successful.";
-            }
-
             switch (exitCode)
             {
                 case AdminHelperExitCodes.Usage:
@@ -243,54 +221,11 @@ namespace MacBookEco.App
                 case AdminHelperExitCodes.Failed:
                     return "The helper could not complete the requested transaction. "
                         + "No unverified change is treated as successful.";
+                case AdminHelperExitCodes.Indeterminate:
+                    return "The helper reached an indeterminate transaction boundary. "
+                        + "Recovery must reconcile the durable journal before another privileged change.";
                 default:
                     return "The helper returned exit code " + exitCode + ".";
-            }
-        }
-
-        private static string DescribeDiagnosticReason(
-            int exitCode,
-            string reason)
-        {
-            if (reason == null)
-            {
-                return string.Empty;
-            }
-
-            return " Diagnostic: " + reason + " (" +
-                DiagnosticExplanation(exitCode) + ").";
-        }
-
-        private static string DiagnosticExplanation(int exitCode)
-        {
-            switch (exitCode)
-            {
-                case AdminHelperExitCodes.Unsupported:
-                    return "the reviewed hardware profile did not match";
-                case AdminHelperExitCodes.RequiresNative60:
-                    return "the desktop was not at native 60 Hz";
-                case AdminHelperExitCodes.ExternalDisplaysAttached:
-                    return "an external display was attached";
-                case AdminHelperExitCodes.DescriptorSlotsUnavailable:
-                    return "the base EDID did not have two free descriptor slots";
-                case AdminHelperExitCodes.ExistingOverride:
-                    return "an unowned override blocked a new install";
-                case AdminHelperExitCodes.HistoricalJournalState:
-                    return "the historical profile could not be reconciled";
-                case AdminHelperExitCodes.MonitorIdentityMismatch:
-                    return "the stored and live monitor identities did not match";
-                case AdminHelperExitCodes.JournalConflict:
-                    return "the protected journal or owned override did not match";
-                case AdminHelperExitCodes.InstallReconciliation:
-                    return "install reconciliation could not prove live state";
-                case AdminHelperExitCodes.RestoreReconciliation:
-                    return "restore reconciliation could not prove live state";
-                case AdminHelperExitCodes.JournalPersistence:
-                    return "the final protected journal state could not be saved";
-                case AdminHelperExitCodes.NativeFailure:
-                    return "a Windows operation failed";
-                default:
-                    return "an unexpected helper failure occurred";
             }
         }
 

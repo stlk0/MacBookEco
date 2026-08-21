@@ -43,9 +43,10 @@ namespace MacBookEco.Admin
                             delegate {
                                 PrintDisplayResult(installResult);
                             });
-                        return installResult.Succeeded
+                        int installExit = installResult.Succeeded
                             ? AdminHelperExitCodes.Success
-                            : DiagnosticExitCode(installResult);
+                            : AdminHelperExitCodes.Indeterminate;
+                        return installExit;
                     }
 
                     case "remove-display":
@@ -57,9 +58,10 @@ namespace MacBookEco.Admin
                             delegate {
                                 PrintDisplayResult(restoreResult);
                             });
-                        return restoreResult.Succeeded
+                        int restoreDisplayExit = restoreResult.Succeeded
                             ? AdminHelperExitCodes.Success
-                            : DiagnosticExitCode(restoreResult);
+                            : AdminHelperExitCodes.Indeterminate;
+                        return restoreDisplayExit;
                     }
 
                     case "apply-power":
@@ -72,7 +74,8 @@ namespace MacBookEco.Admin
                             delegate {
                                 PrintPowerResult(applyResult);
                             });
-                        return ExitCodeForPowerResult(applyResult);
+                        int applyExit = ExitCodeForPowerResult(applyResult);
+                        return applyExit;
                     }
 
                     case "restore-power":
@@ -84,7 +87,9 @@ namespace MacBookEco.Admin
                             delegate {
                                 PrintPowerResult(restorePowerResult);
                             });
-                        return ExitCodeForPowerResult(restorePowerResult);
+                        int restorePowerExit =
+                            ExitCodeForPowerResult(restorePowerResult);
+                        return restorePowerExit;
                     }
 
                     default:
@@ -104,131 +109,8 @@ namespace MacBookEco.Admin
                     ex.GetType().Name +
                     ": " +
                     ex.Message);
-                return DiagnosticExitCode(ex);
+                return AdminHelperExitCodes.Failed;
             }
-        }
-
-        private static int DiagnosticExitCode(
-            EdidOverrideOperationResult result)
-        {
-            if (result == null)
-            {
-                return AdminHelperExitCodes.Indeterminate;
-            }
-
-            string message = result.Message ?? string.Empty;
-            if (Contains(message, "journal state could not be saved"))
-            {
-                return AdminHelperExitCodes.JournalPersistence;
-            }
-
-            if (Contains(message, "install"))
-            {
-                return AdminHelperExitCodes.InstallReconciliation;
-            }
-
-            return Contains(message, "restore") || Contains(message, "removed")
-                ? AdminHelperExitCodes.RestoreReconciliation
-                : AdminHelperExitCodes.Indeterminate;
-        }
-
-        private static int DiagnosticExitCode(
-            Exception exception)
-        {
-            string message = exception == null
-                ? string.Empty
-                : exception.Message ?? string.Empty;
-            int specificCode = DiagnosticExitCode(message);
-            if (specificCode != AdminHelperExitCodes.Failed)
-            {
-                return specificCode;
-            }
-
-            if (exception is SecureStateException)
-            {
-                return AdminHelperExitCodes.JournalConflict;
-            }
-
-            return exception is System.ComponentModel.Win32Exception ||
-                exception is System.IO.IOException ||
-                exception is UnauthorizedAccessException
-                    ? AdminHelperExitCodes.NativeFailure
-                    : AdminHelperExitCodes.Failed;
-        }
-
-        private static int DiagnosticExitCode(
-            string message)
-        {
-            if (Contains(message, "60 Hz"))
-            {
-                return AdminHelperExitCodes.RequiresNative60;
-            }
-
-            if (Contains(message, "Disconnect external displays"))
-            {
-                return AdminHelperExitCodes.ExternalDisplaysAttached;
-            }
-
-            if (Contains(message, "enough free") ||
-                Contains(message, "descriptor slot"))
-            {
-                return AdminHelperExitCodes.DescriptorSlotsUnavailable;
-            }
-
-            if (Contains(message, "pre-existing EDID override"))
-            {
-                return AdminHelperExitCodes.ExistingOverride;
-            }
-
-            if (Contains(message, "compiled display profile") ||
-                Contains(message, "historical") ||
-                Contains(message, "no compiled display profile"))
-            {
-                return AdminHelperExitCodes.HistoricalJournalState;
-            }
-
-            if (Contains(message, "identity") ||
-                Contains(message, "monitor devnode") ||
-                Contains(message, "internal display target") ||
-                Contains(message, "same internal panel"))
-            {
-                return AdminHelperExitCodes.MonitorIdentityMismatch;
-            }
-
-            if (Contains(message, "journal state could not be saved"))
-            {
-                return AdminHelperExitCodes.JournalPersistence;
-            }
-
-            if (Contains(message, "install reconciliation") ||
-                Contains(message, "pending EDID install") ||
-                Contains(message, "EDID write"))
-            {
-                return AdminHelperExitCodes.InstallReconciliation;
-            }
-
-            if (Contains(message, "restore reconciliation") ||
-                Contains(message, "could not be removed safely"))
-            {
-                return AdminHelperExitCodes.RestoreReconciliation;
-            }
-
-            if (Contains(message, "journal") ||
-                Contains(message, "owned value") ||
-                Contains(message, "owned bytes") ||
-                Contains(message, "differs from"))
-            {
-                return AdminHelperExitCodes.JournalConflict;
-            }
-
-            return AdminHelperExitCodes.Failed;
-        }
-
-        private static bool Contains(string value, string expected)
-        {
-            return value.IndexOf(
-                expected,
-                StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static void TryConfigureConsole()

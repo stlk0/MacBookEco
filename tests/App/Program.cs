@@ -101,8 +101,6 @@ namespace MacBookEco.Tests.App
                     TestAdminHelperWaitsForTerminalExit),
                 Test("Admin helper exposes only fixed commands",
                     TestAdminHelperFixedArguments),
-                Test("Admin helper diagnostics accept only bounded reason codes",
-                    TestAdminHelperDiagnosticExitCodes),
                 Test("Admin helper maps every exit-code category",
                     TestAdminHelperExitCodeMappings),
                 Test("Display persistence preserves watchdog ordering",
@@ -261,21 +259,31 @@ namespace MacBookEco.Tests.App
                     "read-back",
                     true,
                     true));
-                DisplayModeChoice verified58 = null;
+                DisplayModeChoice mode48 = null;
+                DisplayModeChoice mode58 = null;
                 foreach (object item in profiles.DisplayMode.Items)
                 {
                     DisplayModeChoice choice = item as DisplayModeChoice;
-                    if (choice != null && choice.RefreshRateHz == 58)
+                    if (choice == null)
                     {
-                        verified58 = choice;
+                        continue;
+                    }
+
+                    if (choice.RefreshRateHz == 48)
+                    {
+                        mode48 = choice;
+                    }
+                    else if (choice.RefreshRateHz == 58)
+                    {
+                        mode58 = choice;
                     }
                 }
-                Check.That(
-                    verified58 != null &&
-                        verified58.DisplayName.IndexOf(
-                            "experimental",
-                            StringComparison.OrdinalIgnoreCase) < 0,
-                    "the hardware-verified 58 Hz profile was labeled experimental");
+                Check.Equal("48 Hz", mode48 == null
+                    ? null
+                    : mode48.DisplayName);
+                Check.Equal("58 Hz", mode58 == null
+                    ? null
+                    : mode58.DisplayName);
 
                 Check.That(
                     profiles.DisplayApplyButton.Height
@@ -409,7 +417,7 @@ namespace MacBookEco.Tests.App
             OptimizationActionResult action = OptimizationActionResult.Failed(
                 OperationCode.UnhandledException,
                 PrivateMarker,
-                "helper-exit=23;helper-reason=ExistingOverride");
+                PrivateMarker);
 
             HardwareSnapshot hardware = CreatePublicDiagnosticsHardware();
             string profileDiagnostics =
@@ -430,9 +438,6 @@ namespace MacBookEco.Tests.App
             Check.That(
                 report.Contains("Code: UnhandledException"),
                 "public diagnostics omitted the stable operation code");
-            Check.That(
-                report.Contains("Helper diagnostic: ExistingOverride"),
-                "public diagnostics omitted the bounded helper reason");
             Check.That(
                 report.Contains("48 Hz mode exposed by Windows: False"),
                 "public diagnostics omitted live 48 Hz readiness");
@@ -1278,66 +1283,6 @@ namespace MacBookEco.Tests.App
                 });
         }
 
-        private static void TestAdminHelperDiagnosticExitCodes()
-        {
-            int[] exitCodes =
-            {
-                AdminHelperExitCodes.Unsupported,
-                AdminHelperExitCodes.RequiresNative60,
-                AdminHelperExitCodes.ExternalDisplaysAttached,
-                AdminHelperExitCodes.DescriptorSlotsUnavailable,
-                AdminHelperExitCodes.ExistingOverride,
-                AdminHelperExitCodes.HistoricalJournalState,
-                AdminHelperExitCodes.MonitorIdentityMismatch,
-                AdminHelperExitCodes.JournalConflict,
-                AdminHelperExitCodes.NativeFailure,
-                AdminHelperExitCodes.InstallReconciliation,
-                AdminHelperExitCodes.RestoreReconciliation,
-                AdminHelperExitCodes.JournalPersistence
-            };
-            string[] reasons =
-            {
-                "UnsupportedHardware",
-                "RequiresNative60",
-                "ExternalDisplaysAttached",
-                "DescriptorSlotsUnavailable",
-                "ExistingOverride",
-                "HistoricalJournalState",
-                "MonitorIdentityMismatch",
-                "JournalConflict",
-                "NativeFailure",
-                "InstallReconciliation",
-                "RestoreReconciliation",
-                "JournalPersistence"
-            };
-
-            for (int index = 0; index < exitCodes.Length; index++)
-            {
-                Check.Equal(
-                    reasons[index],
-                    AdminHelperExitCodes.DiagnosticReason(exitCodes[index]));
-            }
-
-            Check.Equal(null, AdminHelperExitCodes.DiagnosticReason(255));
-            Check.True(AdminHelperExitCodes.IsIndeterminate(
-                AdminHelperExitCodes.Indeterminate));
-            Check.True(AdminHelperExitCodes.IsIndeterminate(
-                AdminHelperExitCodes.InstallReconciliation));
-            Check.True(AdminHelperExitCodes.IsIndeterminate(
-                AdminHelperExitCodes.RestoreReconciliation));
-            Check.True(AdminHelperExitCodes.IsIndeterminate(
-                AdminHelperExitCodes.JournalPersistence));
-            Check.False(AdminHelperExitCodes.IsIndeterminate(
-                AdminHelperExitCodes.JournalConflict));
-
-            OptimizationActionResult result =
-                ElevatedAdminHelper.HelperFailure(
-                    AdminHelperExitCodes.ExistingOverride);
-            Check.Equal(
-                "helper-exit=23;helper-reason=ExistingOverride",
-                result.DiagnosticDetail);
-        }
-
         private static void TestAdminHelperExitCodeMappings()
         {
             int[] exitCodes =
@@ -1379,17 +1324,6 @@ namespace MacBookEco.Tests.App
                         "helper failure diagnostics must retain the exit code");
                 }
             }
-
-            OptimizationActionResult diagnosticResult =
-                ElevatedAdminHelper.HelperFailure(
-                    AdminHelperExitCodes.ExistingOverride);
-            Check.That(
-                diagnosticResult.Message.Contains(
-                    "Diagnostic: ExistingOverride"),
-                "the bounded helper reason must be visible to the user");
-            Check.Equal(
-                "helper-exit=23;helper-reason=ExistingOverride",
-                diagnosticResult.DiagnosticDetail);
         }
 
         private static void TestDisplayPersistencePreservesWatchdogOrdering()
@@ -1792,7 +1726,6 @@ namespace MacBookEco.Tests.App
                 && installedUi.CanInstall
                 && installedUi.ShowRemove
                 && installedUi.CanRemove
-                && installedUi.Mode58Text == "58 Hz High efficiency"
                 && installedUi.InstallText == "Refresh Eco display support",
                 "owned display support must expose both Eco modes, repair, and remove");
 
@@ -1816,7 +1749,6 @@ namespace MacBookEco.Tests.App
             Check.That(legacyUi.CanSelect48Hz
                 && !legacyUi.CanSelect58Hz
                 && legacyUi.CanInstall
-                && legacyUi.Mode58Text == "58 Hz (experimental)"
                 && legacyUi.InstallText == "Refresh Eco display support",
                 "legacy support must offer one-click refresh without exposing 58 Hz early");
 

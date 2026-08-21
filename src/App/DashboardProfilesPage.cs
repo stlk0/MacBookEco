@@ -258,7 +258,7 @@ namespace MacBookEco.App
             layout.Controls.Add(CreateWrappingCaption(
                 "48 Hz is the Apple-supported compatibility mode. 58 Hz uses "
                 + "the native pixel clock with a longer V-blank to allow lower "
-                + "idle GPU memory clocks; unverified profiles are marked experimental."),
+                + "idle GPU memory clocks."),
                 0,
                 3);
 

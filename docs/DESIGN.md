@@ -36,8 +36,7 @@ MacBook Eco uses three executables:
 
 The companion executables are embedded in the main application. Their bytes are
 verified before launch while replacement is denied for the duration of the
-operation. Helper failures expose only bounded reason codes; exception text,
-device identity, paths, and EDID bytes never cross into public diagnostics.
+operation.
 
 ## Display changes
 

@@ -20,15 +20,11 @@ namespace MacBookEco.App
         internal bool CanRemove;
         internal bool ShowRemove;
         internal string InstallText;
-        internal string Mode58Text;
         internal string SupportText;
     }
 
     internal static class DisplaySupportUiPolicy
     {
-        internal const string Experimental58ModeText = "58 Hz (experimental)";
-        internal const string Verified58ModeText = "58 Hz High efficiency";
-
         internal static DisplaySupportUiState Evaluate(
             OptimizationStateSnapshot optimizationState,
             bool current48Hz,
@@ -75,9 +71,6 @@ namespace MacBookEco.App
             result.InstallText = installed || conflict
                 ? "Refresh Eco display support"
                 : "Install 48 + 58 Hz support";
-            result.Mode58Text = mode58 != null && !mode58.Experimental
-                ? Verified58ModeText
-                : Experimental58ModeText;
             // Re-running the install action for an owned profile is a safe
             // read-back repair: the elevated service reconciles the exact
             // owned bytes and never overwrites a foreign override.  A fresh

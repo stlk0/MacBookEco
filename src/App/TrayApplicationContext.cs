@@ -103,12 +103,11 @@ namespace MacBookEco.App
 
             ToolStripMenuItem displayMenu =
                 new ToolStripMenuItem("Display refresh rate");
-            _refresh48Item = TrackMutation(new ToolStripMenuItem("48 Hz Eco"));
+            _refresh48Item = TrackMutation(new ToolStripMenuItem("48 Hz"));
             _refresh48Item.Click += delegate {
                 RunCommand(OptimizationCommand.SetDisplayRefreshRate(48));
             };
-            _refresh58Item = TrackMutation(new ToolStripMenuItem(
-                DisplaySupportUiPolicy.Experimental58ModeText));
+            _refresh58Item = TrackMutation(new ToolStripMenuItem("58 Hz"));
             _refresh58Item.Click += delegate {
                 RunCommand(OptimizationCommand.SetDisplayRefreshRate(58));
             };
@@ -321,7 +320,6 @@ namespace MacBookEco.App
             SetMenuItemEnabled(_refresh48Item, display.CanSelect48Hz);
             SetMenuItemEnabled(_refresh58Item, display.CanSelect58Hz);
             SetMenuItemEnabled(_refresh60Item, display.CanSelect60Hz);
-            _refresh58Item.Text = display.Mode58Text;
             string installText = display.InstallText + "...";
             if (!string.Equals(
                 _installDisplayItem.Text,

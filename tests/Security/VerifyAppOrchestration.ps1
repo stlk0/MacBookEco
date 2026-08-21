@@ -25,7 +25,6 @@ function Assert-That {
 
 $adminHelper = Read-Source 'src\App\ElevatedAdminHelper.cs'
 $adminProgram = Read-Source 'src\Admin\Program.cs'
-$helperExitCodes = Read-Source 'src\Core\AdminHelperExitCodes.cs'
 $dashboard = Read-Source 'src\App\DashboardForm.cs'
 $tray = Read-Source 'src\App\TrayApplicationContext.cs'
 $program = Read-Source 'src\App\Program.cs'
@@ -44,24 +43,6 @@ foreach ($forbidden in @(
 }
 Assert-That -Condition (-not $adminHelper.Contains('ReadHelperReport()')) -Message (
     'GUI helper adapter must not read an unverified path-based helper report.')
-Assert-That -Condition (-not $adminHelper.Contains('NamedPipeServerStream')) -Message (
-    'GUI helper diagnostics must not add a caller-controlled IPC channel.')
-Assert-That -Condition (-not $adminProgram.Contains(
-    'NamedPipeClientStream')) -Message (
-    'elevated helper diagnostics must remain process-exit codes only.')
-Assert-That -Condition $adminHelper.Contains(
-    'AdminHelperExitCodes.DiagnosticReason(exitCode)') -Message (
-    'GUI helper adapter must decode only the bounded exit-code contract.')
-foreach ($forbidden in @(
-        'DeviceInstanceId',
-        'MonitorDevicePath',
-        'RegistryDevicePath',
-        'ToByteArray()',
-        'exception.Message'
-    )) {
-    Assert-That -Condition (-not $helperExitCodes.Contains($forbidden)) -Message (
-        "diagnostic exit codes must not carry private or free-form data '$forbidden'.")
-}
 $appProjectReference = $appTestsProject.SelectSingleNode(
     "/Project/ItemGroup/ProjectReference[@Include='MacBookEco.csproj']")
 Assert-That -Condition ($null -ne $appProjectReference) -Message (
