@@ -27,6 +27,9 @@ namespace MacBookEco.App
         private bool _displaySelectionDirty;
         private bool _mutationControlsEnabled = true;
         private string _last58Text;
+        private bool? _lastShow48Hz;
+        private bool? _lastShow58Hz;
+        private bool? _lastShow60Hz;
 
         public DashboardProfilesController(object customProfileItem)
         {
@@ -313,14 +316,15 @@ namespace MacBookEco.App
             }
 
             DisplaySupportUiState displayState = CurrentDisplaySupport();
-            UpdateDisplayModeLabel(displayState.Mode58Text);
+            UpdateDisplayModeChoices(displayState);
             int? selectedRefreshRate = SelectedDisplayRefreshRate();
             bool canApply = selectedRefreshRate == 48
                 ? displayState.CanSelect48Hz
                 : selectedRefreshRate == 58
                     ? displayState.CanSelect58Hz
                     : selectedRefreshRate == 60 && displayState.CanSelect60Hz;
-            _page.DisplayMode.Enabled = _mutationControlsEnabled;
+            _page.DisplayMode.Enabled = _mutationControlsEnabled &&
+                _page.DisplayMode.Items.Count > 0;
             _page.DisplayApplyButton.Enabled = canApply &&
                 !_display.IsRefreshRate(selectedRefreshRate ?? 0);
             if (!string.Equals(
@@ -500,37 +504,60 @@ namespace MacBookEco.App
                 _optimizationState,
                 _display.IsRefreshRate(48.0),
                 _display.IsRefreshRate(58.0),
+                _display.IsRefreshRate(60.0),
                 _mutationControlsEnabled);
         }
 
-        private void UpdateDisplayModeLabel(string mode58Text)
+        private void UpdateDisplayModeChoices(DisplaySupportUiState state)
         {
             if (string.Equals(
                     _last58Text,
-                    mode58Text,
-                    StringComparison.Ordinal))
+                    state.Mode58Text,
+                    StringComparison.Ordinal) &&
+                _lastShow48Hz == state.Show48Hz &&
+                _lastShow58Hz == state.Show58Hz &&
+                _lastShow60Hz == state.Show60Hz)
             {
                 return;
             }
 
-            _last58Text = mode58Text;
+            _last58Text = state.Mode58Text;
+            _lastShow48Hz = state.Show48Hz;
+            _lastShow58Hz = state.Show58Hz;
+            _lastShow60Hz = state.Show60Hz;
             int? selected = SelectedDisplayRefreshRate();
 
             _synchronizingSelections = true;
             try
             {
                 _page.DisplayMode.Items.Clear();
-                _page.DisplayMode.Items.Add(
-                    new DisplayModeChoice(48, "48 Hz Eco"));
-                _page.DisplayMode.Items.Add(new DisplayModeChoice(
-                    58,
-                    mode58Text));
-                _page.DisplayMode.Items.Add(
-                    new DisplayModeChoice(60, "60 Hz Native"));
+                if (state.Show48Hz)
+                {
+                    _page.DisplayMode.Items.Add(
+                        new DisplayModeChoice(48, "48 Hz Eco"));
+                }
+
+                if (state.Show58Hz)
+                {
+                    _page.DisplayMode.Items.Add(new DisplayModeChoice(
+                        58,
+                        state.Mode58Text));
+                }
+
+                if (state.Show60Hz)
+                {
+                    _page.DisplayMode.Items.Add(
+                        new DisplayModeChoice(60, "60 Hz Native"));
+                }
             }
             finally
             {
                 _synchronizingSelections = false;
+            }
+
+            if (!selected.HasValue && _display.RefreshRateHz.HasValue)
+            {
+                selected = (int)Math.Round(_display.RefreshRateHz.Value);
             }
 
             if (selected.HasValue)

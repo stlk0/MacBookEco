@@ -59,9 +59,12 @@ For a 48/58/60 Hz switch, the application:
 The saved identity is resolved again before rollback. A Windows display number
 such as `DISPLAY1` is never treated as a durable identity.
 
-An older exact 48-only app-owned profile can be refreshed by the current
-helper. It first completes a journaled exact-owned restore, then starts a new
-journaled install. A foreign or modified override is never migrated.
+An older app-owned profile can be refreshed without compiling every historical
+frequency into the current catalog. For a historical profile ID, the helper
+requires the protected journal's stable monitor identity and SHA-256 to match
+the exact live 128-byte override. It then completes a compare-before-delete
+restore and starts a new journaled install. A missing journal, mismatched hash,
+foreign value, or modified override is never migrated.
 
 ## Power changes
 

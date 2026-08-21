@@ -84,6 +84,9 @@ namespace MacBookEco.Tests.Core
                     "EDID recovery policy covers every durable retry boundary",
                     RecoveryPolicyMatrix),
                 Test(
+                    "Protected EDID journal recognizes exact historical bytes",
+                    ProtectedJournalOwnershipClassification),
+                Test(
                     "EDID journal transition matrix is exhaustive",
                     EdidTransitionMatrix),
                 Test(
@@ -700,6 +703,47 @@ namespace MacBookEco.Tests.Core
             }
         }
 
+        private static void ProtectedJournalOwnershipClassification()
+        {
+            byte[] ownedOverride = new byte[EdidBaseBlock.Length];
+            for (var index = 0; index < ownedOverride.Length; index++)
+            {
+                ownedOverride[index] = (byte)index;
+            }
+
+            Sha256Digest ownedHash = Sha256Digest.Compute(ownedOverride);
+            Check.Equal(
+                EdidLiveOverrideState.ExactOwned,
+                EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                    ownedOverride,
+                    ownedHash));
+            Check.Equal(
+                EdidLiveOverrideState.Absent,
+                EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                    null,
+                    ownedHash));
+
+            byte[] modifiedOverride = (byte[])ownedOverride.Clone();
+            modifiedOverride[64] ^= 1;
+            Check.Equal(
+                EdidLiveOverrideState.ForeignOrInvalid,
+                EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                    modifiedOverride,
+                    ownedHash));
+            Check.Equal(
+                EdidLiveOverrideState.ForeignOrInvalid,
+                EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                    new byte[EdidBaseBlock.Length - 1],
+                    ownedHash));
+            Check.Throws<ArgumentNullException>(
+                delegate
+                {
+                    EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                        ownedOverride,
+                        null);
+                });
+        }
+
         private static void RecoveryPolicyRejectsUnknownInputs()
         {
             Check.Throws<ArgumentOutOfRangeException>(
@@ -745,6 +789,10 @@ namespace MacBookEco.Tests.Core
             Check.True(DisplayModeSelectionPolicy.IsEcoRefreshRate(48));
             Check.True(DisplayModeSelectionPolicy.IsEcoRefreshRate(58));
             Check.False(DisplayModeSelectionPolicy.IsEcoRefreshRate(60));
+            Check.True(
+                DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(59));
+            Check.True(
+                DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(61));
 
             var current = new DisplayModeKey(
                 3072,

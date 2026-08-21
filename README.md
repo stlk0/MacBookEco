@@ -61,9 +61,11 @@ driver.
 Installing display support and selecting a refresh rate are separate operations. MacBook
 Eco never removes an EDID override created by another tool.
 
-An existing exact MacBook Eco 48-only profile is refreshed in the same helper
-operation. It does not need to be removed with the older app, and only the
-final Windows restart is required to load the new mode list.
+An existing exact MacBook Eco profile is refreshed in the same helper operation,
+even when an older build used different timings. The protected ownership journal
+and exact live bytes must still match. Only modes currently exposed by Windows
+appear in the selector. The replacement uses one helper operation and requires
+only the final Windows restart that loads the new mode list.
 
 48 Hz is the compatibility mode listed by Apple. The native-clock 58 Hz mode
 has been hardware-verified on the primary Radeon Pro 5300M profile. It remains

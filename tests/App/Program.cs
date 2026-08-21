@@ -682,11 +682,14 @@ namespace MacBookEco.Tests.App
                 harness.Service.ReadState();
             Check.True(!pendingRestart.Display48HzAvailable);
             Check.True(!pendingRestart.Display58HzAvailable);
+            Check.True(!pendingRestart.Display60HzAvailable);
             harness.Display48HzAvailable = true;
             harness.Display58HzAvailable = true;
+            harness.Display60HzAvailable = true;
             OptimizationStateSnapshot ready = harness.Service.ReadState();
             Check.True(ready.Display48HzAvailable);
             Check.True(ready.Display58HzAvailable);
+            Check.True(ready.Display60HzAvailable);
 
             harness.DisplayStatus = new DisplayOverrideStatus
             {
@@ -1630,6 +1633,32 @@ namespace MacBookEco.Tests.App
             Check.That(
                 page.DisplayState.Text.Length > 0,
                 "the display support state must render before telemetry arrives");
+            Check.Equal(0, page.DisplayMode.Items.Count);
+
+            controller.UpdateDisplay(new DisplayTelemetry(
+                TelemetryAvailability.Available,
+                "DISPLAY1",
+                3072,
+                1920,
+                59.0,
+                string.Empty));
+            controller.UpdateOptimizationState(new OptimizationStateSnapshot(
+                true,
+                false,
+                null,
+                "NotInstalled",
+                "Installed",
+                "historical-research-profile",
+                "read-back",
+                false,
+                false,
+                true));
+            Check.Equal(1, page.DisplayMode.Items.Count);
+            DisplayModeChoice availableMode =
+                page.DisplayMode.Items[0] as DisplayModeChoice;
+            Check.That(
+                availableMode != null && availableMode.RefreshRateHz == 60,
+                "the selector exposed an Eco mode not enumerated by Windows");
 
             controller.UpdateOptimizationState(null);
             controller.UpdateDisplay(null);
@@ -1670,15 +1699,20 @@ namespace MacBookEco.Tests.App
                 ProfileCatalog.MacBookPro161Appa044EcoModesProfileId,
                 "read-back",
                 true,
+                true,
                 true);
             DisplaySupportUiState installedUi = DisplaySupportUiPolicy.Evaluate(
                 installed,
                 false,
                 false,
+                true,
                 true);
             Check.That(installedUi.CanSelect48Hz
                 && installedUi.CanSelect58Hz
                 && installedUi.CanSelect60Hz
+                && installedUi.Show48Hz
+                && installedUi.Show58Hz
+                && installedUi.Show60Hz
                 && installedUi.CanInstall
                 && installedUi.ShowRemove
                 && installedUi.CanRemove
@@ -1695,11 +1729,13 @@ namespace MacBookEco.Tests.App
                 ProfileCatalog.MacBookPro161Appa044ProfileId,
                 "read-back",
                 true,
-                false);
+                false,
+                true);
             DisplaySupportUiState legacyUi = DisplaySupportUiPolicy.Evaluate(
                 legacy,
                 false,
                 false,
+                true,
                 true);
             Check.That(legacyUi.CanSelect48Hz
                 && !legacyUi.CanSelect58Hz
@@ -1707,6 +1743,19 @@ namespace MacBookEco.Tests.App
                 && legacyUi.Mode58Text == "58 Hz (experimental)"
                 && legacyUi.InstallText == "Refresh Eco display support",
                 "legacy support must offer one-click refresh without exposing 58 Hz early");
+
+            DisplaySupportUiState legacyAt59Ui =
+                DisplaySupportUiPolicy.Evaluate(
+                    legacy,
+                    false,
+                    false,
+                    false,
+                    true);
+            Check.That(!legacyAt59Ui.CanInstall
+                && legacyAt59Ui.SupportText.IndexOf(
+                    "Return to 60 Hz",
+                    StringComparison.OrdinalIgnoreCase) >= 0,
+                "legacy support must not start replacement from 59 Hz");
 
             OptimizationStateSnapshot pendingRestart =
                 new OptimizationStateSnapshot(
@@ -1716,15 +1765,22 @@ namespace MacBookEco.Tests.App
                     "NotInstalled",
                     "Installed",
                     ProfileCatalog.MacBookPro161Appa044EcoModesProfileId,
-                    "read-back");
+                    "read-back",
+                    false,
+                    false,
+                    true);
             DisplaySupportUiState pendingUi = DisplaySupportUiPolicy.Evaluate(
                 pendingRestart,
                 false,
                 false,
+                true,
                 true);
             Check.That(!pendingUi.CanSelect48Hz
                 && !pendingUi.CanSelect58Hz
                 && pendingUi.CanSelect60Hz
+                && !pendingUi.Show48Hz
+                && !pendingUi.Show58Hz
+                && pendingUi.Show60Hz
                 && !pendingUi.CanInstall
                 && pendingUi.SupportText.IndexOf(
                     "Restart Windows",
@@ -1738,11 +1794,15 @@ namespace MacBookEco.Tests.App
                 "NotInstalled",
                 "NotInstalled",
                 string.Empty,
-                "read-back");
+                "read-back",
+                false,
+                false,
+                true);
             DisplaySupportUiState missingUi = DisplaySupportUiPolicy.Evaluate(
                 notInstalled,
                 false,
                 false,
+                true,
                 true);
             Check.That(!missingUi.CanSelect48Hz
                 && missingUi.CanSelect60Hz
@@ -1755,6 +1815,7 @@ namespace MacBookEco.Tests.App
             DisplaySupportUiState externalUi = DisplaySupportUiPolicy.Evaluate(
                 notInstalled,
                 true,
+                false,
                 false,
                 true);
             Check.That(!externalUi.CanSelect48Hz
@@ -1770,11 +1831,15 @@ namespace MacBookEco.Tests.App
                 "NotInstalled",
                 "Conflict",
                 string.Empty,
-                "read-back");
+                "read-back",
+                false,
+                false,
+                true);
             DisplaySupportUiState repairUi = DisplaySupportUiPolicy.Evaluate(
                 conflict,
                 false,
                 false,
+                true,
                 true);
             Check.That(!repairUi.CanSelect48Hz
                 && repairUi.CanSelect60Hz
@@ -1787,6 +1852,7 @@ namespace MacBookEco.Tests.App
                 installed,
                 false,
                 false,
+                true,
                 false);
             Check.That(!busyUi.CanSelect48Hz
                 && !busyUi.CanSelect58Hz
@@ -2240,6 +2306,7 @@ namespace MacBookEco.Tests.App
             public int PowerStatusReads;
             public bool Display48HzAvailable;
             public bool Display58HzAvailable;
+            public bool Display60HzAvailable;
             public int DisplayRefreshRate;
             public Func<
                 DisplayModeConfirmationRequest,
@@ -2292,7 +2359,9 @@ namespace MacBookEco.Tests.App
             {
                 return refreshRateHz == 48
                     ? Display48HzAvailable
-                    : refreshRateHz == 58 && Display58HzAvailable;
+                    : refreshRateHz == 58
+                        ? Display58HzAvailable
+                        : refreshRateHz == 60 && Display60HzAvailable;
             }
 
             private OptimizationActionResult RunAdminCommand(

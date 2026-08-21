@@ -103,7 +103,7 @@ namespace MacBookEco.Tests.Watchdog
             try
             {
                 MonitorIdentity targetIdentity = CreateTargetIdentity();
-                DisplayModeKey originalMode = CreateOriginalMode(58);
+                DisplayModeKey originalMode = CreateOriginalMode(59);
                 DisplayWatchdogSessionState state =
                     DisplayWatchdogProtocol.CreateSession(
                         targetIdentity,

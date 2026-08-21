@@ -288,7 +288,8 @@ namespace MacBookEco.App
                     display.State == ManagedResourceState.Installed
                         && ReadModeAvailability(48),
                     display.State == ManagedResourceState.Installed
-                        && ReadModeAvailability(58));
+                        && ReadModeAvailability(58),
+                    ReadModeAvailability(60));
             }
             catch (Exception exception)
             {

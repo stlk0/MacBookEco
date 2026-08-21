@@ -220,8 +220,10 @@ namespace MacBookEco.Platform.Windows
             EdidLiveOverrideState liveState;
             try
             {
-                liveState = context.Target.ClassifyOverride(
-                    context.ExpectedOverride);
+                liveState = context.ProvenLiveState.HasValue
+                    ? context.ProvenLiveState.Value
+                    : context.Target.ClassifyOverride(
+                        context.ExpectedOverride);
             }
             catch (Exception exception)
             {
@@ -341,8 +343,10 @@ namespace MacBookEco.Platform.Windows
                 EdidLiveOverrideState liveState;
                 try
                 {
-                    liveState = context.Target.ClassifyOverride(
-                        context.ExpectedOverride);
+                    liveState = context.ProvenLiveState.HasValue
+                        ? context.ProvenLiveState.Value
+                        : context.Target.ClassifyOverride(
+                            context.ExpectedOverride);
                 }
                 catch (Exception exception)
                 {
@@ -423,8 +427,7 @@ namespace MacBookEco.Platform.Windows
                 journal.Payload.Target.ProfileId);
             if (profile == null)
             {
-                throw new SecureStateConflictException(
-                    "The journal references no compiled display profile.");
+                return ResolveHistoricalInstallContext(journal);
             }
 
             WindowsHardwareSnapshot snapshot = discovery.Discover();
@@ -451,16 +454,52 @@ namespace MacBookEco.Platform.Windows
                 profile);
         }
 
+        private InstallContext ResolveHistoricalInstallContext(
+            EdidJournal journal)
+        {
+            if (journal.State != EdidJournalState.Installed &&
+                journal.State != EdidJournalState.Conflict)
+            {
+                throw new SecureStateConflictException(
+                    "An unfinished install references no compiled display profile.");
+            }
+
+            ResolvedMonitorTarget target = targetResolver.ResolveStoredForRestore(
+                journal.Payload.Target.Monitor,
+                journal.Payload.OwnedOverrideHash);
+            if (!target.MatchesIdentity(
+                    journal.Payload.Target.Monitor,
+                    journal.Payload.OwnedOverrideHash))
+            {
+                throw new SecureStateConflictException(
+                    "The historical display target no longer matches its " +
+                    "durable identity.");
+            }
+
+            byte[] currentOverride = target.ReadOverride();
+            // The profile ID may come from a build newer or older than this
+            // catalog. The protected journal still proves the exact resource:
+            // stable monitor identity plus the digest recorded before write.
+            EdidLiveOverrideState liveState =
+                EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                    currentOverride,
+                    journal.Payload.OwnedOverrideHash);
+            return new InstallContext(
+                target,
+                liveState == EdidLiveOverrideState.ExactOwned
+                    ? currentOverride
+                    : null,
+                null,
+                null,
+                null,
+                liveState);
+        }
+
         private RestoreContext ResolveRestoreContext(EdidJournal journal)
         {
             RequirePayload(journal);
             DisplayProfile profile = ProfileCatalog.GetById(
                 journal.Payload.Target.ProfileId);
-            if (profile == null)
-            {
-                throw new SecureStateConflictException(
-                    "The journal references no compiled display profile.");
-            }
 
             // This resolver has no active CCD/GDI dependency.  It enumerates
             // monitor-class devnodes, including non-present devices, and
@@ -476,10 +515,28 @@ namespace MacBookEco.Platform.Windows
                     "The re-resolved monitor does not match the durable EDID identity.");
             }
 
+            if (profile == null)
+            {
+                byte[] currentOverride = target.ReadOverride();
+                // DeleteExactOwnedOverride later compares these same bytes
+                // again on the mutation handle; the journal hash alone never
+                // authorizes a blind delete.
+                EdidLiveOverrideState liveState =
+                    EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                        currentOverride,
+                        journal.Payload.OwnedOverrideHash);
+                return new RestoreContext(
+                    target,
+                    liveState == EdidLiveOverrideState.ExactOwned
+                        ? currentOverride
+                        : null,
+                    liveState);
+            }
+
             ValidateRestoreProfile(profile, target);
             byte[] expectedOverride = CompileOwnedOverride(profile, target);
             VerifyJournaledOwnershipHash(journal, expectedOverride);
-            return new RestoreContext(target, expectedOverride);
+            return new RestoreContext(target, expectedOverride, null);
         }
 
         private static void ValidateInstallPreconditions(
@@ -776,13 +833,15 @@ namespace MacBookEco.Platform.Windows
                 byte[] expectedOverride,
                 WindowsHardwareSnapshot snapshot,
                 HardwareSnapshot hardware,
-                DisplayProfile profile)
+                DisplayProfile profile,
+                EdidLiveOverrideState? provenLiveState = null)
             {
                 Target = target;
                 ExpectedOverride = expectedOverride;
                 Snapshot = snapshot;
                 Hardware = hardware;
                 Profile = profile;
+                ProvenLiveState = provenLiveState;
             }
 
             internal ResolvedMonitorTarget Target { get; private set; }
@@ -794,21 +853,27 @@ namespace MacBookEco.Platform.Windows
             internal HardwareSnapshot Hardware { get; private set; }
 
             internal DisplayProfile Profile { get; private set; }
+
+            internal EdidLiveOverrideState? ProvenLiveState { get; private set; }
         }
 
         private sealed class RestoreContext
         {
             internal RestoreContext(
                 ResolvedMonitorTarget target,
-                byte[] expectedOverride)
+                byte[] expectedOverride,
+                EdidLiveOverrideState? provenLiveState)
             {
                 Target = target;
                 ExpectedOverride = expectedOverride;
+                ProvenLiveState = provenLiveState;
             }
 
             internal ResolvedMonitorTarget Target { get; private set; }
 
             internal byte[] ExpectedOverride { get; private set; }
+
+            internal EdidLiveOverrideState? ProvenLiveState { get; private set; }
         }
     }
 

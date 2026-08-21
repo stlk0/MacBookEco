@@ -82,13 +82,13 @@ namespace MacBookEco.App
                     displayTarget.RefreshRateNumerator,
                     displayTarget.RefreshRateDenominator);
                 DisplayModeKey originalModeKey = originalMode.Key;
-                if (!DisplayModeSelectionPolicy.IsReviewedRefreshRate(
+                if (!DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(
                         originalMode.RefreshRate))
                 {
                     return OptimizationActionResult.Unsupported(
                         OperationCode.UnsupportedCapability,
-                        "The current refresh rate is not a reviewed 48/58/60 Hz "
-                        + "watchdog recovery target.");
+                        "The current refresh rate is not a supported watchdog "
+                        + "recovery target.");
                 }
 
                 if (originalMode.RefreshRate == refreshRateHz)
@@ -268,7 +268,7 @@ namespace MacBookEco.App
 
         internal bool IsRefreshRateModeAvailable(int refreshRateHz)
         {
-            if (!DisplayModeSelectionPolicy.IsEcoRefreshRate(refreshRateHz))
+            if (!DisplayModeSelectionPolicy.IsReviewedRefreshRate(refreshRateHz))
             {
                 return false;
             }

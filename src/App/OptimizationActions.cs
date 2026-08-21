@@ -69,7 +69,8 @@ namespace MacBookEco.App
             string displayProfileId,
             string detail,
             bool display48HzAvailable = false,
-            bool display58HzAvailable = false)
+            bool display58HzAvailable = false,
+            bool display60HzAvailable = false)
         {
             Available = available;
             CpuProfileActive = cpuProfileActive;
@@ -80,6 +81,7 @@ namespace MacBookEco.App
             Detail = detail ?? string.Empty;
             Display48HzAvailable = display48HzAvailable;
             Display58HzAvailable = display58HzAvailable;
+            Display60HzAvailable = display60HzAvailable;
         }
 
         public bool Available { get; private set; }
@@ -91,6 +93,7 @@ namespace MacBookEco.App
         public string Detail { get; private set; }
         public bool Display48HzAvailable { get; private set; }
         public bool Display58HzAvailable { get; private set; }
+        public bool Display60HzAvailable { get; private set; }
 
         public static OptimizationStateSnapshot Unavailable(string detail)
         {

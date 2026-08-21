@@ -13,6 +13,9 @@ namespace MacBookEco.App
         internal bool CanSelect48Hz;
         internal bool CanSelect58Hz;
         internal bool CanSelect60Hz;
+        internal bool Show48Hz;
+        internal bool Show58Hz;
+        internal bool Show60Hz;
         internal bool CanInstall;
         internal bool CanRemove;
         internal bool ShowRemove;
@@ -30,6 +33,7 @@ namespace MacBookEco.App
             OptimizationStateSnapshot optimizationState,
             bool current48Hz,
             bool current58Hz,
+            bool current60Hz,
             bool mutationControlsEnabled)
         {
             string state = optimizationState == null
@@ -53,13 +57,19 @@ namespace MacBookEco.App
                 optimizationState.Display48HzAvailable;
             bool ready58 = installed && !legacy &&
                 optimizationState.Display58HzAvailable;
+            bool ready60 = stateAvailable &&
+                optimizationState.Display60HzAvailable;
 
             DisplaySupportUiState result = new DisplaySupportUiState();
             result.CanSelect48Hz = mutationControlsEnabled && ready48;
             result.CanSelect58Hz = mutationControlsEnabled && ready58;
-            // Native 60 Hz is a recovery action and never depends on EDID
-            // ownership. The use case itself still validates the hardware.
-            result.CanSelect60Hz = mutationControlsEnabled;
+            result.Show48Hz = ready48 || current48Hz;
+            result.Show58Hz = ready58 || current58Hz;
+            result.Show60Hz = ready60 || current60Hz;
+            // Native 60 Hz never depends on EDID ownership, but it must still
+            // be enumerated by Windows for the current display configuration.
+            result.CanSelect60Hz = mutationControlsEnabled &&
+                result.Show60Hz;
             result.ShowRemove = installed;
             result.CanRemove = mutationControlsEnabled && installed;
             result.InstallText = installed || conflict
@@ -76,9 +86,9 @@ namespace MacBookEco.App
             result.CanInstall = mutationControlsEnabled
                 && stateAvailable
                 && (legacy
-                    ? !current48Hz && !current58Hz
-                    : (installed && ready48 && ready58) || conflict ||
-                        (recoverable && !current48Hz && !current58Hz));
+                    ? current60Hz
+                    : (installed && ready48 && ready58) ||
+                        ((conflict || recoverable) && current60Hz));
             result.SupportText = SupportText(
                 stateAvailable,
                 installed,
@@ -89,6 +99,7 @@ namespace MacBookEco.App
                 restored,
                 current48Hz,
                 current58Hz,
+                current60Hz,
                 state);
             return result;
         }
@@ -103,6 +114,7 @@ namespace MacBookEco.App
             bool restored,
             bool current48Hz,
             bool current58Hz,
+            bool current60Hz,
             string state)
         {
             if (!stateAvailable)
@@ -114,8 +126,10 @@ namespace MacBookEco.App
             {
                 if (legacy)
                 {
-                    return "Existing MacBook Eco display support is installed. "
-                        + "Return to 60 Hz and refresh setup to add all modes.";
+                    return current60Hz
+                        ? "Existing MacBook Eco display support is installed. "
+                            + "Refresh setup to add all modes."
+                        : "Return to 60 Hz before refreshing Eco display support.";
                 }
 
                 return ready48 && ready58
@@ -146,8 +160,10 @@ namespace MacBookEco.App
 
             if (IsState(state, "Conflict"))
             {
-                return "Eco display support needs verification. Repair is available "
-                    + "only when the live override exactly matches MacBook Eco.";
+                return current60Hz
+                    ? "Eco display support needs verification. Repair is available "
+                        + "only when the live override exactly matches MacBook Eco."
+                    : "Return to 60 Hz before repairing Eco display support.";
             }
 
             return "Eco display support status is unavailable.";

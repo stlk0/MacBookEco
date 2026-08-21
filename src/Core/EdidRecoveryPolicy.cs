@@ -4,9 +4,10 @@ namespace MacBookEco.Core
 {
     /// <summary>
     /// The only live-state classifications used by the EDID reconciliation
-    /// coordinator.  "Owned" means that the caller has independently proved
-    /// byte-for-byte equality with the compiled override and its journaled
-    /// SHA-256; a matching hash alone is never sufficient.
+    /// coordinator. "Owned" means that the caller has independently proved
+    /// the stable monitor identity and either byte-for-byte equality with a
+    /// compiled override or equality with the SHA-256 stored in MacBook Eco's
+    /// protected journal for a historical profile.
     /// </summary>
     public enum EdidLiveOverrideState
     {
@@ -43,6 +44,26 @@ namespace MacBookEco.Core
     /// </summary>
     public static class EdidRecoveryPolicy
     {
+        public static EdidLiveOverrideState ClassifyProtectedJournalOverride(
+            byte[] currentOverride,
+            Sha256Digest ownedOverrideHash)
+        {
+            if (ownedOverrideHash == null)
+            {
+                throw new ArgumentNullException(nameof(ownedOverrideHash));
+            }
+
+            if (currentOverride == null)
+            {
+                return EdidLiveOverrideState.Absent;
+            }
+
+            return currentOverride.Length == EdidBaseBlock.Length &&
+                Sha256Digest.Compute(currentOverride).Equals(ownedOverrideHash)
+                    ? EdidLiveOverrideState.ExactOwned
+                    : EdidLiveOverrideState.ForeignOrInvalid;
+        }
+
         public static EdidReconciliationAction ForInstall(
             EdidJournalState state,
             EdidLiveOverrideState liveState)
@@ -75,9 +96,9 @@ namespace MacBookEco.Core
                     // Conflict repair is deliberately asymmetric: exact
                     // owned bytes can restore the durable Installed marker,
                     // but absent or foreign bytes remain fail-closed. The
-                    // Windows coordinator proves target identity, profile,
-                    // ownership digest and full byte equality before calling
-                    // this policy.
+                    // The Windows coordinator proves target identity plus
+                    // either the compiled profile bytes or the exact protected
+                    // historical ownership digest before calling this policy.
                     return liveState == EdidLiveOverrideState.ExactOwned
                         ? EdidReconciliationAction.MarkInstalled
                         : EdidReconciliationAction.Blocked;

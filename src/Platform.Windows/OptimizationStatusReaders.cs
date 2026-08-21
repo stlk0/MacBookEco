@@ -100,9 +100,6 @@ namespace MacBookEco.Platform.Windows
 
                 DisplayProfile profile = ProfileCatalog.GetById(
                     journal.Payload.Target.ProfileId);
-                if (profile == null)
-                    return ManagedResourceState.Conflict;
-
                 ResolvedMonitorTarget target =
                     _targetResolver.ResolveStoredForRestore(
                         journal.Payload.Target.Monitor,
@@ -111,6 +108,15 @@ namespace MacBookEco.Platform.Windows
                         journal.Payload.Target.Monitor,
                         journal.Payload.OwnedOverrideHash))
                     return ManagedResourceState.Conflict;
+
+                if (profile == null)
+                {
+                    return ClassifyTerminalState(
+                        journal.State,
+                        EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                            target.ReadOverride(),
+                            journal.Payload.OwnedOverrideHash));
+                }
 
                 EdidBaseBlock baseEdid = new EdidBaseBlock(target.BaseEdid);
                 if (!string.Equals(

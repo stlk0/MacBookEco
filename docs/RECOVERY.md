@@ -28,7 +28,8 @@ Diagnostics output.
 For `InstallPending`, `RestorePending`, or `Conflict`, retry the same install or
 remove action from the current build. MacBook Eco will compare the recorded
 identity and exact live override before making another change. It will not
-delete a foreign or modified override.
+delete a foreign or modified override. This also allows a newer build to replace
+an older app-owned timing profile without first uninstalling the older build.
 
 ## Power plan
 

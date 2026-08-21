@@ -357,10 +357,11 @@ namespace MacBookEco.Platform.Windows
 
         private static void ValidateRefreshRate(int refreshRate)
         {
-            if (!DisplayModeSelectionPolicy.IsReviewedRefreshRate(refreshRate))
+            if (!DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(
+                    refreshRate))
                 throw new ArgumentOutOfRangeException(
                     nameof(refreshRate),
-                    "Only the reviewed 48/58 Hz and native 60 Hz transitions are permitted.");
+                    "Only reviewed modes and historical rollback modes are permitted.");
         }
 
         private static void ValidateConfirmationTimeout(TimeSpan confirmationTimeout)

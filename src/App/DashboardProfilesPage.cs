@@ -237,11 +237,6 @@ namespace MacBookEco.App
             FlowLayoutPanel modes = CreateButtonRow();
             DisplayMode = CreateComboBox();
             DisplayMode.Width = 230;
-            DisplayMode.Items.Add(new DisplayModeChoice(48, "48 Hz Eco"));
-            DisplayMode.Items.Add(new DisplayModeChoice(
-                58,
-                DisplaySupportUiPolicy.Experimental58ModeText));
-            DisplayMode.Items.Add(new DisplayModeChoice(60, "60 Hz Native"));
             DisplayMode.SelectedIndexChanged += _displayModeChanged;
             modes.Controls.Add(DisplayMode);
             DisplayApplyButton = DashboardTheme.CreateSecondaryButton(
