@@ -147,6 +147,18 @@ namespace MacBookEco.Core
             return FindById(LegacyProfiles, profileId);
         }
 
+        public static bool ShouldRefreshInstalledProfile(
+            string installedProfileId,
+            string selectedProfileId)
+        {
+            return !string.IsNullOrWhiteSpace(installedProfileId) &&
+                !string.IsNullOrWhiteSpace(selectedProfileId) &&
+                !string.Equals(
+                    installedProfileId,
+                    selectedProfileId,
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
         private static DisplayProfile FindById(
             ReadOnlyCollection<DisplayProfile> profiles,
             string profileId)

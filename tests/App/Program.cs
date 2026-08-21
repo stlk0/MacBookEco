@@ -1796,13 +1796,13 @@ namespace MacBookEco.Tests.App
 
         private static void TestDisplayProfileRefreshSelection()
         {
-            Check.True(EdidOverrideService.ShouldRefreshInstalledProfile(
+            Check.True(ProfileCatalog.ShouldRefreshInstalledProfile(
                 ProfileCatalog.MacBookPro161Appa044ProfileId,
                 ProfileCatalog.MacBookPro161Appa044EcoModesProfileId));
-            Check.False(EdidOverrideService.ShouldRefreshInstalledProfile(
+            Check.False(ProfileCatalog.ShouldRefreshInstalledProfile(
                 ProfileCatalog.MacBookPro161Appa044EcoModesProfileId,
                 ProfileCatalog.MacBookPro161Appa044EcoModesProfileId));
-            Check.False(EdidOverrideService.ShouldRefreshInstalledProfile(
+            Check.False(ProfileCatalog.ShouldRefreshInstalledProfile(
                 string.Empty,
                 ProfileCatalog.MacBookPro161Appa044EcoModesProfileId));
         }

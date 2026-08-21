@@ -107,21 +107,9 @@ namespace MacBookEco.Platform.Windows
             HardwareSnapshot hardware = discovery.Discover().ToCoreSnapshot();
             ProfileSelectionResult selection = ProfileCatalog.Select(hardware);
             return selection.HardwareSupported &&
-                ShouldRefreshInstalledProfile(
+                ProfileCatalog.ShouldRefreshInstalledProfile(
                     journal.Payload.Target.ProfileId,
                     selection.Profile.Id);
-        }
-
-        internal static bool ShouldRefreshInstalledProfile(
-            string installedProfileId,
-            string selectedProfileId)
-        {
-            return !string.IsNullOrWhiteSpace(installedProfileId) &&
-                !string.IsNullOrWhiteSpace(selectedProfileId) &&
-                !string.Equals(
-                    installedProfileId,
-                    selectedProfileId,
-                    StringComparison.OrdinalIgnoreCase);
         }
 
         private void ValidateUpgradePreconditions()
