@@ -101,6 +101,8 @@ namespace MacBookEco.Tests.App
                     TestAdminHelperWaitsForTerminalExit),
                 Test("Admin helper exposes only fixed commands",
                     TestAdminHelperFixedArguments),
+                Test("Admin helper diagnostics accept only bounded reason codes",
+                    TestAdminHelperDiagnosticExitCodes),
                 Test("Admin helper maps every exit-code category",
                     TestAdminHelperExitCodeMappings),
                 Test("Display persistence preserves watchdog ordering",
@@ -407,7 +409,7 @@ namespace MacBookEco.Tests.App
             OptimizationActionResult action = OptimizationActionResult.Failed(
                 OperationCode.UnhandledException,
                 PrivateMarker,
-                PrivateMarker);
+                "helper-exit=23;helper-reason=ExistingOverride");
 
             HardwareSnapshot hardware = CreatePublicDiagnosticsHardware();
             string profileDiagnostics =
@@ -428,6 +430,9 @@ namespace MacBookEco.Tests.App
             Check.That(
                 report.Contains("Code: UnhandledException"),
                 "public diagnostics omitted the stable operation code");
+            Check.That(
+                report.Contains("Helper diagnostic: ExistingOverride"),
+                "public diagnostics omitted the bounded helper reason");
             Check.That(
                 report.Contains("48 Hz mode exposed by Windows: False"),
                 "public diagnostics omitted live 48 Hz readiness");
@@ -1273,6 +1278,66 @@ namespace MacBookEco.Tests.App
                 });
         }
 
+        private static void TestAdminHelperDiagnosticExitCodes()
+        {
+            int[] exitCodes =
+            {
+                AdminHelperExitCodes.Unsupported,
+                AdminHelperExitCodes.RequiresNative60,
+                AdminHelperExitCodes.ExternalDisplaysAttached,
+                AdminHelperExitCodes.DescriptorSlotsUnavailable,
+                AdminHelperExitCodes.ExistingOverride,
+                AdminHelperExitCodes.HistoricalJournalState,
+                AdminHelperExitCodes.MonitorIdentityMismatch,
+                AdminHelperExitCodes.JournalConflict,
+                AdminHelperExitCodes.NativeFailure,
+                AdminHelperExitCodes.InstallReconciliation,
+                AdminHelperExitCodes.RestoreReconciliation,
+                AdminHelperExitCodes.JournalPersistence
+            };
+            string[] reasons =
+            {
+                "UnsupportedHardware",
+                "RequiresNative60",
+                "ExternalDisplaysAttached",
+                "DescriptorSlotsUnavailable",
+                "ExistingOverride",
+                "HistoricalJournalState",
+                "MonitorIdentityMismatch",
+                "JournalConflict",
+                "NativeFailure",
+                "InstallReconciliation",
+                "RestoreReconciliation",
+                "JournalPersistence"
+            };
+
+            for (int index = 0; index < exitCodes.Length; index++)
+            {
+                Check.Equal(
+                    reasons[index],
+                    AdminHelperExitCodes.DiagnosticReason(exitCodes[index]));
+            }
+
+            Check.Equal(null, AdminHelperExitCodes.DiagnosticReason(255));
+            Check.True(AdminHelperExitCodes.IsIndeterminate(
+                AdminHelperExitCodes.Indeterminate));
+            Check.True(AdminHelperExitCodes.IsIndeterminate(
+                AdminHelperExitCodes.InstallReconciliation));
+            Check.True(AdminHelperExitCodes.IsIndeterminate(
+                AdminHelperExitCodes.RestoreReconciliation));
+            Check.True(AdminHelperExitCodes.IsIndeterminate(
+                AdminHelperExitCodes.JournalPersistence));
+            Check.False(AdminHelperExitCodes.IsIndeterminate(
+                AdminHelperExitCodes.JournalConflict));
+
+            OptimizationActionResult result =
+                ElevatedAdminHelper.HelperFailure(
+                    AdminHelperExitCodes.ExistingOverride);
+            Check.Equal(
+                "helper-exit=23;helper-reason=ExistingOverride",
+                result.DiagnosticDetail);
+        }
+
         private static void TestAdminHelperExitCodeMappings()
         {
             int[] exitCodes =
@@ -1314,6 +1379,17 @@ namespace MacBookEco.Tests.App
                         "helper failure diagnostics must retain the exit code");
                 }
             }
+
+            OptimizationActionResult diagnosticResult =
+                ElevatedAdminHelper.HelperFailure(
+                    AdminHelperExitCodes.ExistingOverride);
+            Check.That(
+                diagnosticResult.Message.Contains(
+                    "Diagnostic: ExistingOverride"),
+                "the bounded helper reason must be visible to the user");
+            Check.Equal(
+                "helper-exit=23;helper-reason=ExistingOverride",
+                diagnosticResult.DiagnosticDetail);
         }
 
         private static void TestDisplayPersistencePreservesWatchdogOrdering()

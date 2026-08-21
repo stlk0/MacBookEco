@@ -172,12 +172,20 @@ namespace MacBookEco.App
             OperationCode code,
             string message)
         {
+            return Unsupported(code, message, string.Empty);
+        }
+
+        internal static OptimizationActionResult Unsupported(
+            OperationCode code,
+            string message,
+            string diagnosticDetail)
+        {
             return new OptimizationActionResult(
                 OperationOutcome.Unsupported,
                 code,
                 false,
                 message,
-                string.Empty);
+                diagnosticDetail);
         }
 
         public static OptimizationActionResult Cancelled(

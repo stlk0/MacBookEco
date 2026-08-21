@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Globalization;
 using System.Text;
 using System.Windows.Forms;
 using MacBookEco.AppPolicy;
@@ -149,6 +150,13 @@ namespace MacBookEco.App
                 text.AppendLine("Code: " + lastActionResult.Code);
                 text.AppendLine(
                     "Restart required: " + lastActionResult.RestartRequired);
+                string helperDiagnostic = PublicHelperDiagnostic(
+                    lastActionResult.DiagnosticDetail);
+                if (helperDiagnostic != null)
+                {
+                    text.AppendLine(
+                        "Helper diagnostic: " + helperDiagnostic);
+                }
             }
 
             return text.ToString();
@@ -174,6 +182,55 @@ namespace MacBookEco.App
         {
             DisplayProfile profile = ProfileCatalog.GetById(value);
             return profile == null ? "N/A" : profile.Id;
+        }
+
+        private static string PublicHelperDiagnostic(string detail)
+        {
+            const string ExitPrefix = "helper-exit=";
+            const string ReasonMarker = ";helper-reason=";
+            if (string.IsNullOrEmpty(detail) ||
+                !detail.StartsWith(ExitPrefix, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            int markerIndex = detail.IndexOf(
+                ReasonMarker,
+                ExitPrefix.Length,
+                StringComparison.Ordinal);
+            if (markerIndex <= ExitPrefix.Length)
+            {
+                return null;
+            }
+
+            string exitValue = detail.Substring(
+                ExitPrefix.Length,
+                markerIndex - ExitPrefix.Length);
+            int exitCode;
+            if (!int.TryParse(
+                    exitValue,
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out exitCode) ||
+                !string.Equals(
+                    exitValue,
+                    exitCode.ToString(CultureInfo.InvariantCulture),
+                    StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            string reason = AdminHelperExitCodes.DiagnosticReason(exitCode);
+            if (reason == null ||
+                !string.Equals(
+                    detail,
+                    ExitPrefix + exitValue + ReasonMarker + reason,
+                    StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            return reason;
         }
 
         private Control BuildView()
