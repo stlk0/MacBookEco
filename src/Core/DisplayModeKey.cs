@@ -174,6 +174,16 @@ namespace MacBookEco.Core
     /// </summary>
     public static class DisplayModeSelectionPolicy
     {
+        public static bool IsReviewedRefreshRate(int refreshRate)
+        {
+            return refreshRate == 48 || refreshRate == 58 || refreshRate == 60;
+        }
+
+        public static bool IsEcoRefreshRate(int refreshRate)
+        {
+            return refreshRate == 48 || refreshRate == 58;
+        }
+
         public static bool IsExactRefreshOnlyCandidate(
             DisplayModeKey current,
             DisplayModeKey candidate,

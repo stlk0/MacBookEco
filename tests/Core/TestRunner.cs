@@ -295,6 +295,12 @@ namespace MacBookEco.Tests.Core
             Check.True(installed.ContainsDetailedTiming(
                 selected.Profile.GetTargetMode(58).Timing));
             Check.False(selected.Profile.GetTargetMode(58).Experimental);
+            Check.Equal(
+                selected.Profile,
+                ProfileCatalog.FindExactInstalledProfile(
+                    hardware,
+                    installed.ToByteArray(),
+                    58));
 
             var otherDriver = new HardwareSnapshot(
                 "Apple Inc.",
@@ -343,13 +349,23 @@ namespace MacBookEco.Tests.Core
             Check.NotNull(legacy);
             Check.NotNull(legacy.GetTargetMode(48));
             Check.True(legacy.GetTargetMode(58) == null);
-            Check.Equal(1, legacy.TargetModes.Count);
             Check.Equal(
                 ProfileCatalog.MacBookPro161Appa044EcoModesProfileId,
                 ProfileCatalog.Select(hardware).Profile.Id);
             Check.Equal(
                 1,
                 legacy.BuildOverride(hardware).CountFreeDescriptors());
+            byte[] legacyOverride = legacy.BuildOverride(hardware).ToByteArray();
+            Check.Equal(
+                legacy,
+                ProfileCatalog.FindExactInstalledProfile(
+                    hardware,
+                    legacyOverride,
+                    48));
+            Check.True(ProfileCatalog.FindExactInstalledProfile(
+                hardware,
+                legacyOverride,
+                58) == null);
         }
 
         private static void Radeon5500Appa044ProfileMatches()
@@ -722,6 +738,14 @@ namespace MacBookEco.Tests.Core
 
         private static void RefreshOnlyModeSelectionPreservesCurrentKey()
         {
+            Check.True(DisplayModeSelectionPolicy.IsReviewedRefreshRate(48));
+            Check.True(DisplayModeSelectionPolicy.IsReviewedRefreshRate(58));
+            Check.True(DisplayModeSelectionPolicy.IsReviewedRefreshRate(60));
+            Check.False(DisplayModeSelectionPolicy.IsReviewedRefreshRate(59));
+            Check.True(DisplayModeSelectionPolicy.IsEcoRefreshRate(48));
+            Check.True(DisplayModeSelectionPolicy.IsEcoRefreshRate(58));
+            Check.False(DisplayModeSelectionPolicy.IsEcoRefreshRate(60));
+
             var current = new DisplayModeKey(
                 3072,
                 1920,

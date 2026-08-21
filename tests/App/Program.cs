@@ -1682,6 +1682,7 @@ namespace MacBookEco.Tests.App
                 && installedUi.CanInstall
                 && installedUi.ShowRemove
                 && installedUi.CanRemove
+                && installedUi.Mode58Text == "58 Hz High efficiency"
                 && installedUi.InstallText == "Refresh Eco display support",
                 "owned display support must expose both Eco modes, repair, and remove");
 
@@ -1703,6 +1704,7 @@ namespace MacBookEco.Tests.App
             Check.That(legacyUi.CanSelect48Hz
                 && !legacyUi.CanSelect58Hz
                 && legacyUi.CanInstall
+                && legacyUi.Mode58Text == "58 Hz (experimental)"
                 && legacyUi.InstallText == "Refresh Eco display support",
                 "legacy support must offer one-click refresh without exposing 58 Hz early");
 
@@ -2255,8 +2257,7 @@ namespace MacBookEco.Tests.App
                     RunAdminCommand,
                     cpuHardwareSupport,
                     startupRecovery,
-                    Is48HzModeAvailable,
-                    Is58HzModeAvailable);
+                    IsRefreshRateModeAvailable);
             }
 
             private OptimizationActionResult SetDisplayRefreshRate(
@@ -2287,14 +2288,11 @@ namespace MacBookEco.Tests.App
                 return PowerStatus;
             }
 
-            private bool Is48HzModeAvailable()
+            private bool IsRefreshRateModeAvailable(int refreshRateHz)
             {
-                return Display48HzAvailable;
-            }
-
-            private bool Is58HzModeAvailable()
-            {
-                return Display58HzAvailable;
+                return refreshRateHz == 48
+                    ? Display48HzAvailable
+                    : refreshRateHz == 58 && Display58HzAvailable;
             }
 
             private OptimizationActionResult RunAdminCommand(

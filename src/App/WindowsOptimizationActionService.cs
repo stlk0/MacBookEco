@@ -76,8 +76,7 @@ namespace MacBookEco.App
             Func<AdminCommand, OptimizationActionResult> runAdminCommand,
             CpuHardwareSupportStatus cpuHardwareSupport,
             OptimizationActionResult startupRecovery = null,
-            Func<bool> is48HzModeAvailable = null,
-            Func<bool> is58HzModeAvailable = null)
+            Func<int, bool> isRefreshRateModeAvailable = null)
         {
             if (setDisplayRefreshRate == null)
             {
@@ -103,18 +102,8 @@ namespace MacBookEco.App
             _readEdidStatus = readEdidStatus;
             _readPowerStatus = readPowerStatus;
             _runAdminCommand = runAdminCommand;
-            _isRefreshRateModeAvailable = delegate(int refreshRateHz)
-            {
-                if (refreshRateHz == 48)
-                {
-                    return is48HzModeAvailable != null &&
-                        is48HzModeAvailable();
-                }
-
-                return refreshRateHz == 58 &&
-                    is58HzModeAvailable != null &&
-                    is58HzModeAvailable();
-            };
+            _isRefreshRateModeAvailable = isRefreshRateModeAvailable ??
+                delegate { return false; };
             _cpuHardwareSupport = cpuHardwareSupport;
             _displayMutationsBlocked = ShouldBlockDisplayMutations(
                 startupRecovery);

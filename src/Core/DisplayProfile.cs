@@ -158,8 +158,6 @@ namespace MacBookEco.Core
 
         public DetailedTiming NativeTiming { get; private set; }
 
-        public ReadOnlyCollection<DisplayRefreshMode> TargetModes => _targetModes;
-
         public string VerifiedGpuName { get; private set; }
 
         public string VerifiedGpuDeviceIdPrefix { get; private set; }

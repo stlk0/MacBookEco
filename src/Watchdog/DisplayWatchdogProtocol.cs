@@ -525,9 +525,8 @@ namespace MacBookEco.DisplaySafety
             if (originalMode.Width <= 0
                 || originalMode.Height <= 0
                 || originalMode.BitsPerPixel <= 0
-                || (originalMode.RefreshRate != 48 &&
-                    originalMode.RefreshRate != 58 &&
-                    originalMode.RefreshRate != 60)
+                || !DisplayModeSelectionPolicy.IsReviewedRefreshRate(
+                    originalMode.RefreshRate)
                 || originalMode.RefreshRateNumerator == 0
                 || originalMode.RefreshRateDenominator == 0)
             {

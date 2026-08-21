@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using MacBookEco.AppPolicy;
-using MacBookEco.Core;
 using MacBookEco.Telemetry;
 
 namespace MacBookEco.App
@@ -108,7 +107,7 @@ namespace MacBookEco.App
                 RunCommand(OptimizationCommand.SetDisplayRefreshRate(48));
             };
             _refresh58Item = TrackMutation(new ToolStripMenuItem(
-                "58 Hz (experimental)"));
+                DisplaySupportUiPolicy.Experimental58ModeText));
             _refresh58Item.Click += delegate {
                 RunCommand(OptimizationCommand.SetDisplayRefreshRate(58));
             };
@@ -312,15 +311,7 @@ namespace MacBookEco.App
             SetMenuItemEnabled(_refresh48Item, display.CanSelect48Hz);
             SetMenuItemEnabled(_refresh58Item, display.CanSelect58Hz);
             SetMenuItemEnabled(_refresh60Item, display.CanSelect60Hz);
-            DisplayProfile profile = state == null
-                ? null
-                : ProfileCatalog.GetById(state.DisplayProfileId);
-            DisplayRefreshMode mode58 = profile == null
-                ? null
-                : profile.GetTargetMode(58);
-            _refresh58Item.Text = mode58 != null && !mode58.Experimental
-                ? "58 Hz High efficiency"
-                : "58 Hz (experimental)";
+            _refresh58Item.Text = display.Mode58Text;
             string installText = display.InstallText + "...";
             if (!string.Equals(
                 _installDisplayItem.Text,

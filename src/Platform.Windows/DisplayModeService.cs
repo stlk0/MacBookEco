@@ -357,7 +357,7 @@ namespace MacBookEco.Platform.Windows
 
         private static void ValidateRefreshRate(int refreshRate)
         {
-            if (refreshRate != 48 && refreshRate != 58 && refreshRate != 60)
+            if (!DisplayModeSelectionPolicy.IsReviewedRefreshRate(refreshRate))
                 throw new ArgumentOutOfRangeException(
                     nameof(refreshRate),
                     "Only the reviewed 48/58 Hz and native 60 Hz transitions are permitted.");

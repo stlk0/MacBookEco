@@ -33,9 +33,6 @@ namespace MacBookEco.Tests.Watchdog
                     "Non-canonical refresh rationals fail closed",
                     delegate { RunInIsolatedRoot(TestNonCanonicalRational); }),
                 new TestCase(
-                    "Reviewed 58 Hz recovery mode is accepted",
-                    delegate { RunInIsolatedRoot(Test58HzSession); }),
-                new TestCase(
                     "Rollback marker wins the persistence-lock race",
                     delegate { RunInIsolatedRoot(TestRollbackMarkerWinsLockRace); })
             };
@@ -105,7 +102,7 @@ namespace MacBookEco.Tests.Watchdog
             try
             {
                 MonitorIdentity targetIdentity = CreateTargetIdentity();
-                DisplayModeKey originalMode = CreateOriginalMode();
+                DisplayModeKey originalMode = CreateOriginalMode(58);
                 DisplayWatchdogSessionState state =
                     DisplayWatchdogProtocol.CreateSession(
                         targetIdentity,
@@ -243,35 +240,6 @@ namespace MacBookEco.Tests.Watchdog
                     1));
         }
 
-        private static void Test58HzSession(string testRoot)
-        {
-            DisplayWatchdogSessionState state =
-                DisplayWatchdogProtocol.CreateSession(
-                    CreateTargetIdentity(),
-                    new DisplayModeKey(
-                        3072,
-                        1920,
-                        32,
-                        58,
-                        0,
-                        0,
-                        0,
-                        58,
-                        1),
-                    TimeSpan.FromSeconds(10));
-            try
-            {
-                Check.That(
-                    DisplayWatchdogProtocol.ReadSession(state.Token)
-                        .OriginalMode.RefreshRate == 58,
-                    "The watchdog did not preserve the 58 Hz recovery mode.");
-            }
-            finally
-            {
-                DisplayWatchdogProtocol.Cleanup(state.Token);
-            }
-        }
-
         private static string CreateIsolatedTestRoot()
         {
             string parent = Path.Combine(
@@ -327,18 +295,18 @@ namespace MacBookEco.Tests.Watchdog
                     "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"));
         }
 
-        private static DisplayModeKey CreateOriginalMode()
+        private static DisplayModeKey CreateOriginalMode(int refreshRate = 60)
         {
             return new DisplayModeKey(
                 3072,
                 1920,
                 32,
-                60,
+                refreshRate,
                 0,
                 0,
                 0,
-                60000,
-                1001);
+                refreshRate == 60 ? 60000U : (uint)refreshRate,
+                refreshRate == 60 ? 1001U : 1U);
         }
 
         private static void AssertSessionContainsNoDisplayEndpoint(

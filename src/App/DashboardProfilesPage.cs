@@ -240,7 +240,7 @@ namespace MacBookEco.App
             DisplayMode.Items.Add(new DisplayModeChoice(48, "48 Hz Eco"));
             DisplayMode.Items.Add(new DisplayModeChoice(
                 58,
-                "58 Hz (experimental)"));
+                DisplaySupportUiPolicy.Experimental58ModeText));
             DisplayMode.Items.Add(new DisplayModeChoice(60, "60 Hz Native"));
             DisplayMode.SelectedIndexChanged += _displayModeChanged;
             modes.Controls.Add(DisplayMode);

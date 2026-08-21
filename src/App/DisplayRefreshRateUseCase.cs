@@ -59,7 +59,7 @@ namespace MacBookEco.App
             Func<DisplayModeConfirmationRequest, DisplayModeConfirmationDecision>
                 confirmation)
         {
-            if (!IsAllowedRefreshRate(refreshRateHz))
+            if (!DisplayModeSelectionPolicy.IsReviewedRefreshRate(refreshRateHz))
             {
                 return OptimizationActionResult.Unsupported(
                     OperationCode.InvalidRequest,
@@ -82,7 +82,8 @@ namespace MacBookEco.App
                     displayTarget.RefreshRateNumerator,
                     displayTarget.RefreshRateDenominator);
                 DisplayModeKey originalModeKey = originalMode.Key;
-                if (!IsAllowedRefreshRate(originalMode.RefreshRate))
+                if (!DisplayModeSelectionPolicy.IsReviewedRefreshRate(
+                        originalMode.RefreshRate))
                 {
                     return OptimizationActionResult.Unsupported(
                         OperationCode.UnsupportedCapability,
@@ -106,7 +107,7 @@ namespace MacBookEco.App
                 {
                     return OptimizationActionResult.Unsupported(
                         OperationCode.UnsupportedCapability,
-                        refreshRateHz == 48 || refreshRateHz == 58
+                        DisplayModeSelectionPolicy.IsEcoRefreshRate(refreshRateHz)
                             ? "Windows has not exposed the requested Eco mode yet. "
                                 + "Restart Windows after installing or repairing "
                                 + "Eco display support."
@@ -267,7 +268,7 @@ namespace MacBookEco.App
 
         internal bool IsRefreshRateModeAvailable(int refreshRateHz)
         {
-            if (refreshRateHz != 48 && refreshRateHz != 58)
+            if (!DisplayModeSelectionPolicy.IsEcoRefreshRate(refreshRateHz))
             {
                 return false;
             }
@@ -351,13 +352,6 @@ namespace MacBookEco.App
                 activeHeight == 1920U &&
                 totalWidth == 3152U &&
                 totalHeight == 2048U;
-        }
-
-        private static bool IsAllowedRefreshRate(int refreshRateHz)
-        {
-            return refreshRateHz == 48 ||
-                refreshRateHz == 58 ||
-                refreshRateHz == 60;
         }
 
         private static DisplayModeKey CreateRefreshOnlyTarget(
