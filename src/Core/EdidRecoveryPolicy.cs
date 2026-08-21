@@ -44,6 +44,13 @@ namespace MacBookEco.Core
     /// </summary>
     public static class EdidRecoveryPolicy
     {
+        public static bool RequiresOriginalForNewInstall(
+            EdidJournalState previousState)
+        {
+            RequireKnownState(previousState);
+            return previousState == EdidJournalState.Restored;
+        }
+
         public static EdidLiveOverrideState ClassifyProtectedJournalOverride(
             byte[] currentOverride,
             Sha256Digest ownedOverrideHash)

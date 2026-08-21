@@ -305,12 +305,18 @@ namespace MacBookEco.Tests.Core
                     new EdidTargetIdentity(legacy.Id, factoryIdentity),
                     Sha256Digest.Compute(legacyEdid.ToByteArray())));
 
-            HardwareSnapshot installHardware =
-                EdidOverrideService.ResolveInstallHardware(
-                    previous,
-                    observedHardware,
-                    legacyTarget,
-                    null);
+            Check.True(EdidRecoveryPolicy.RequiresOriginalForNewInstall(
+                previous.State));
+            Check.Equal(
+                EdidLiveOverrideState.Absent,
+                EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
+                    null,
+                    previous.Payload.OwnedOverrideHash));
+            EdidBaseBlock installEdid;
+            Check.True(legacyTarget.TryResolveOriginalBaseEdid(
+                previous.Payload.Target.Monitor,
+                out installEdid));
+            HardwareSnapshot installHardware = CreateKnownHardware(installEdid);
             Check.BytesEqual(
                 original.ToByteArray(),
                 installHardware.Edid.ToByteArray());

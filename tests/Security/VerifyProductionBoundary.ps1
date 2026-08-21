@@ -47,6 +47,7 @@ function Assert-DoesNotContain {
 
 $edid = Read-Source 'src\Platform.Windows\EdidOverrideService.cs'
 $edidBaseBlock = Read-Source 'src\Core\EdidBaseBlock.cs'
+$edidPolicy = Read-Source 'src\Core\EdidRecoveryPolicy.cs'
 $overrideRegistry = Read-Source 'src\Platform.Windows\EdidOverrideRegistry.cs'
 $devnodeReader = Read-Source 'src\Platform.Windows\MonitorDevnodeReader.cs'
 $devnodeAccess = Read-Source 'src\Platform.Windows\MonitorDevnodeAccess.cs'
@@ -74,7 +75,6 @@ foreach ($forbidden in @(
     Assert-DoesNotContain -Source $edid -Token $forbidden -Boundary 'EDID service'
 }
 foreach ($required in @(
-        'ResolveInstallHardware',
         'ResolveJournaledOriginalHardware',
         'ClassifyProtectedJournalOverride',
         'TryResolveOriginalBaseEdid'
@@ -84,11 +84,14 @@ foreach ($required in @(
 }
 Assert-Contains -Source $statusReaders -Token 'TryResolveOriginalBaseEdid' `
     -Boundary 'stale EDID terminal read-back'
+Assert-Contains -Source $edidPolicy `
+    -Token 'previousState == EdidJournalState.Restored' `
+    -Boundary 'restored EDID install policy'
 $beginInstall = $edid.IndexOf(
     'private EdidOverrideOperationResult BeginNewInstall(',
     [StringComparison]::Ordinal)
 $resolveOriginal = $edid.IndexOf(
-    'ResolveInstallHardware(',
+    'ResolveJournaledOriginalHardware(',
     $beginInstall,
     [StringComparison]::Ordinal)
 $selectProfile = $edid.IndexOf(
