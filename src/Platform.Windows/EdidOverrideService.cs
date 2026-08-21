@@ -122,6 +122,7 @@ namespace MacBookEco.Platform.Windows
                 journal,
                 observedHardware,
                 target,
+                target.ReadOverride(),
                 true);
             DisplayProfile profile = ProfileCatalog.Select(
                 installHardware).Profile;
@@ -165,20 +166,13 @@ namespace MacBookEco.Platform.Windows
             ResolvedMonitorTarget target = targetResolver.ResolveActive();
             ValidateActiveTarget(snapshot, observedHardware, target);
 
-            HardwareSnapshot installHardware = observedHardware;
+            HardwareSnapshot installHardware = ResolveInstallHardware(
+                previous,
+                observedHardware,
+                target,
+                target.ReadOverride());
             ProfileSelectionResult selection = ProfileCatalog.Select(
                 installHardware);
-            if (!selection.CanInstall &&
-                previous != null &&
-                previous.State == EdidJournalState.Restored)
-            {
-                installHardware = ResolveJournaledOriginalHardware(
-                    previous,
-                    observedHardware,
-                    target,
-                    false);
-                selection = ProfileCatalog.Select(installHardware);
-            }
 
             DisplayProfile profile = selection.Profile;
             ValidateInstallPreconditions(
@@ -611,10 +605,31 @@ namespace MacBookEco.Platform.Windows
             ValidateInstallMutationPreconditions(snapshot, hardware, profile);
         }
 
+        internal static HardwareSnapshot ResolveInstallHardware(
+            EdidJournal previous,
+            HardwareSnapshot observedHardware,
+            ResolvedMonitorTarget target,
+            byte[] liveOverride)
+        {
+            if (previous == null ||
+                previous.State != EdidJournalState.Restored)
+            {
+                return observedHardware;
+            }
+
+            return ResolveJournaledOriginalHardware(
+                previous,
+                observedHardware,
+                target,
+                liveOverride,
+                false);
+        }
+
         private static HardwareSnapshot ResolveJournaledOriginalHardware(
             EdidJournal journal,
             HardwareSnapshot observedHardware,
             ResolvedMonitorTarget target,
+            byte[] liveOverride,
             bool requireOwnedOverride)
         {
             RequirePayload(journal);
@@ -628,7 +643,6 @@ namespace MacBookEco.Platform.Windows
                     "journal identity.");
             }
 
-            byte[] liveOverride = target.ReadOverride();
             EdidLiveOverrideState liveState =
                 EdidRecoveryPolicy.ClassifyProtectedJournalOverride(
                     liveOverride,

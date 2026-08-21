@@ -69,6 +69,9 @@ namespace MacBookEco.Tests.Core
                 Test(
                     "Exact journal fingerprint recovers a stale owned EDID",
                     RecoverStaleOwnedEdid),
+                Test(
+                    "Legacy 48 Hz upgrade preserves the factory EDID",
+                    LegacyUpgradePreservesFactoryEdid),
                 Test("Known hardware selects the reviewed profile", KnownProfileMatches),
                 Test(
                     "Legacy 48 Hz profile remains recovery-only",
@@ -242,19 +245,14 @@ namespace MacBookEco.Tests.Core
                 original.ToByteArray(),
                 recovered.ToByteArray());
 
-            MonitorDeviceRecord record = new MonitorDeviceRecord();
-            record.DeviceInstanceId =
+            const string DeviceInstanceId =
                 "MONITOR\\APPA044\\STALE-OWNED-OVERRIDE";
-            record.HardwareId = "MONITOR\\APPA044";
-            record.Edid = stale59.ToByteArray();
-            ResolvedMonitorTarget target = ResolvedMonitorTarget.FromRecord(
-                record,
-                null,
-                0,
-                0);
+            ResolvedMonitorTarget target = CreateResolvedTarget(
+                DeviceInstanceId,
+                stale59);
             MonitorIdentity identity = MonitorIdentity.FromExactBaseEdid(
-                record.DeviceInstanceId,
-                record.HardwareId,
+                DeviceInstanceId,
+                "APPA044",
                 original);
             Check.False(target.MatchesIdentity(identity));
             Check.True(target.MatchesIdentity(
@@ -274,6 +272,88 @@ namespace MacBookEco.Tests.Core
                 .TryRecoverExactOriginal(
                     originalFingerprint,
                     out recovered));
+        }
+
+        private static void LegacyUpgradePreservesFactoryEdid()
+        {
+            EdidBaseBlock original = CreateOriginal();
+            HardwareSnapshot originalHardware = CreateKnownHardware(original);
+            DisplayProfile legacy = ProfileCatalog.GetById(
+                ProfileCatalog.MacBookPro161Appa044ProfileId);
+            EdidBaseBlock legacyEdid = legacy.BuildOverride(originalHardware);
+            HardwareSnapshot observedHardware = CreateKnownHardware(legacyEdid);
+
+            Check.True(ProfileCatalog.Select(observedHardware).CanInstall);
+
+            const string DeviceInstanceId =
+                "MONITOR\\APPA044\\LEGACY-48-UPGRADE";
+            ResolvedMonitorTarget legacyTarget = CreateResolvedTarget(
+                DeviceInstanceId,
+                legacyEdid);
+            MonitorIdentity factoryIdentity =
+                MonitorIdentity.FromExactBaseEdid(
+                    DeviceInstanceId,
+                    "APPA044",
+                    original);
+            EdidJournal previous = new EdidJournal(
+                JournalOperationId.NewId(),
+                new JournalGeneration(2),
+                new DateTime(2026, 8, 21, 12, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 8, 21, 12, 0, 0, DateTimeKind.Utc),
+                EdidJournalState.Restored,
+                new EdidJournalPayload(
+                    new EdidTargetIdentity(legacy.Id, factoryIdentity),
+                    Sha256Digest.Compute(legacyEdid.ToByteArray())));
+
+            HardwareSnapshot installHardware =
+                EdidOverrideService.ResolveInstallHardware(
+                    previous,
+                    observedHardware,
+                    legacyTarget,
+                    null);
+            Check.BytesEqual(
+                original.ToByteArray(),
+                installHardware.Edid.ToByteArray());
+
+            DisplayProfile upgradedProfile =
+                ProfileCatalog.Select(installHardware).Profile;
+            EdidBaseBlock upgradedEdid = upgradedProfile.BuildOverride(
+                installHardware);
+            MonitorIdentity upgradedOriginalIdentity =
+                MonitorIdentity.FromExactBaseEdid(
+                    DeviceInstanceId,
+                    "APPA044",
+                    installHardware.Edid);
+            Check.Equal(
+                factoryIdentity.EdidFingerprint,
+                upgradedOriginalIdentity.EdidFingerprint);
+            EdidJournalPayload upgradedPayload = new EdidJournalPayload(
+                new EdidTargetIdentity(
+                    upgradedProfile.Id,
+                    upgradedOriginalIdentity),
+                Sha256Digest.Compute(upgradedEdid.ToByteArray()));
+            ResolvedMonitorTarget factoryTarget = CreateResolvedTarget(
+                DeviceInstanceId,
+                original);
+            Check.True(factoryTarget.MatchesIdentity(
+                upgradedPayload.Target.Monitor,
+                upgradedPayload.OwnedOverrideHash));
+            Check.Equal(
+                ManagedResourceState.Restored,
+                EdidStatusReader.ClassifyTerminalState(
+                    EdidJournalState.Restored,
+                    EdidLiveOverrideState.Absent));
+        }
+
+        private static ResolvedMonitorTarget CreateResolvedTarget(
+            string deviceInstanceId,
+            EdidBaseBlock edid)
+        {
+            MonitorDeviceRecord record = new MonitorDeviceRecord();
+            record.DeviceInstanceId = deviceInstanceId;
+            record.HardwareId = "MONITOR\\APPA044";
+            record.Edid = edid.ToByteArray();
+            return ResolvedMonitorTarget.FromRecord(record, null, 0, 0);
         }
 
         private static void NormalizedSignature()

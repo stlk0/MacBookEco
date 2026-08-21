@@ -74,6 +74,7 @@ foreach ($forbidden in @(
     Assert-DoesNotContain -Source $edid -Token $forbidden -Boundary 'EDID service'
 }
 foreach ($required in @(
+        'ResolveInstallHardware',
         'ResolveJournaledOriginalHardware',
         'ClassifyProtectedJournalOverride',
         'TryResolveOriginalBaseEdid'
@@ -83,6 +84,22 @@ foreach ($required in @(
 }
 Assert-Contains -Source $statusReaders -Token 'TryResolveOriginalBaseEdid' `
     -Boundary 'stale EDID terminal read-back'
+$beginInstall = $edid.IndexOf(
+    'private EdidOverrideOperationResult BeginNewInstall(',
+    [StringComparison]::Ordinal)
+$resolveOriginal = $edid.IndexOf(
+    'ResolveInstallHardware(',
+    $beginInstall,
+    [StringComparison]::Ordinal)
+$selectProfile = $edid.IndexOf(
+    'ProfileCatalog.Select(',
+    $resolveOriginal,
+    [StringComparison]::Ordinal)
+Assert-That -Condition (
+    $beginInstall -ge 0 -and
+    $resolveOriginal -gt $beginInstall -and
+    $selectProfile -gt $resolveOriginal) `
+    -Message 'restored original EDID must be resolved before profile selection.'
 foreach ($required in @(
         'TryRecoverExactOriginal',
         'Sha256Digest.Compute(candidate).Equals',
