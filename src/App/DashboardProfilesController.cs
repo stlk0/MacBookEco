@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
 using MacBookEco.AppPolicy;
+using MacBookEco.Core;
 using MacBookEco.Telemetry;
 
 namespace MacBookEco.App
