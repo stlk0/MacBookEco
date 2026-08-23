@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using MacBookEco.AppPolicy;
 
 namespace MacBookEco.App
@@ -60,6 +62,8 @@ namespace MacBookEco.App
 
     public sealed class OptimizationStateSnapshot
     {
+        private readonly HashSet<int> _availableDisplayRefreshRates;
+
         public OptimizationStateSnapshot(
             bool available,
             bool cpuProfileActive,
@@ -68,9 +72,7 @@ namespace MacBookEco.App
             string displaySupportState,
             string displayProfileId,
             string detail,
-            bool display48HzAvailable = false,
-            bool display58HzAvailable = false,
-            bool display60HzAvailable = false)
+            IEnumerable<int> availableDisplayRefreshRates = null)
         {
             Available = available;
             CpuProfileActive = cpuProfileActive;
@@ -79,9 +81,11 @@ namespace MacBookEco.App
             DisplaySupportState = displaySupportState ?? string.Empty;
             DisplayProfileId = displayProfileId ?? string.Empty;
             Detail = detail ?? string.Empty;
-            Display48HzAvailable = display48HzAvailable;
-            Display58HzAvailable = display58HzAvailable;
-            Display60HzAvailable = display60HzAvailable;
+            _availableDisplayRefreshRates = availableDisplayRefreshRates == null
+                ? new HashSet<int>()
+                : new HashSet<int>(availableDisplayRefreshRates);
+            AvailableDisplayRefreshRates = new ReadOnlyCollection<int>(
+                new List<int>(_availableDisplayRefreshRates));
         }
 
         public bool Available { get; private set; }
@@ -91,9 +95,16 @@ namespace MacBookEco.App
         public string DisplaySupportState { get; private set; }
         public string DisplayProfileId { get; private set; }
         public string Detail { get; private set; }
-        public bool Display48HzAvailable { get; private set; }
-        public bool Display58HzAvailable { get; private set; }
-        public bool Display60HzAvailable { get; private set; }
+        public ReadOnlyCollection<int> AvailableDisplayRefreshRates
+        {
+            get;
+            private set;
+        }
+
+        public bool IsDisplayModeAvailable(int refreshRate)
+        {
+            return _availableDisplayRefreshRates.Contains(refreshRate);
+        }
 
         public static OptimizationStateSnapshot Unavailable(string detail)
         {

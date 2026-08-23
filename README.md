@@ -2,7 +2,7 @@
 
 MacBook Eco is a small Windows tray utility for Intel MacBooks running Windows
 through Boot Camp. It can reduce heat and idle power use with reviewed 48 Hz
-and 58 Hz display modes and reversible CPU power presets.
+and 60 Hz Eco display modes and reversible CPU power presets.
 
 It is a native WinForms application for .NET Framework 4.8. It has no service,
 kernel driver, bundled runtime, analytics, or network access.
@@ -30,9 +30,9 @@ profile and tested driver.
 
 ## Features
 
-- guarded switching between 48, 58, and 60 Hz with confirmation and automatic
-  rollback;
-- installation and removal of one app-owned 48 + 58 Hz display profile;
+- guarded switching between 48 Hz, 60 Hz Eco, and native 60 Hz with confirmation
+  and automatic rollback;
+- installation and removal of one app-owned 48 Hz + 60 Hz Eco display profile;
 - three reversible CPU presets in an application-owned Windows power plan;
 - battery, CPU, display, and read-only GPU telemetry;
 - five-minute graphs while the dashboard is open;
@@ -49,9 +49,10 @@ driver.
 1. Download `MacBookEco-<version>-win-x64-setup.exe` from
    [GitHub Releases](https://github.com/stlk0/MacBookEco/releases), run it, and
    launch MacBook Eco.
-2. On the supported machine, select **Install 48 + 58 Hz support**, approve UAC, and
+2. On the supported machine, select **Install 48 Hz + 60 Hz Eco support**,
+   approve UAC, and
    restart Windows.
-3. Select **48 Hz** or **58 Hz**. Confirm the mode after checking the picture;
+3. Select **48 Hz** or **60 Hz Eco**. Confirm the mode after checking the picture;
    otherwise the
    application and its watchdog restore the previous mode.
 4. Choose a CPU preset if wanted. The application shows its values before it is
@@ -67,10 +68,11 @@ and exact live bytes must still match. Only modes currently exposed by Windows
 appear in the selector. The replacement uses one helper operation and requires
 only the final Windows restart that loads the new mode list.
 
-48 Hz is the compatibility mode listed by Apple. The native-clock 58 Hz mode
-has been hardware-verified on the primary Radeon Pro 5300M profile. It remains
-explicitly experimental on the other matching APPA044 profiles until each has
-equivalent hardware evidence.
+48 Hz is the compatibility mode listed by Apple. **60 Hz Eco** is the
+Windows `60000/1001` refresh class (shown as about 59.940 Hz) with the exact
+reviewed signal timing that lowered idle GPU power on the primary Radeon Pro
+5300M profile. It remains explicitly experimental on the other matching
+APPA044 profiles until each has equivalent hardware evidence.
 
 The included profiles are:
 

@@ -4,28 +4,121 @@ using System.Collections.ObjectModel;
 
 namespace MacBookEco.Core
 {
+    public sealed class DisplayModeDefinition
+    {
+        public DisplayModeDefinition(
+            int refreshRate,
+            string displayName,
+            bool requiresOwnedSupport,
+            bool nativeRecovery)
+        {
+            if (refreshRate <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(refreshRate));
+            }
+
+            if (string.IsNullOrWhiteSpace(displayName))
+            {
+                throw new ArgumentException(
+                    "A display-mode name is required.",
+                    nameof(displayName));
+            }
+
+            WindowsRefreshRate = refreshRate;
+            DisplayName = displayName.Trim();
+            RequiresOwnedSupport = requiresOwnedSupport;
+            NativeRecovery = nativeRecovery;
+        }
+
+        // EnumDisplaySettingsEx selects refresh rates through an integer
+        // dmDisplayFrequency bucket. A hardware profile carries any exact
+        // fractional signal identity alongside its DTD.
+        public int WindowsRefreshRate { get; private set; }
+        public string DisplayName { get; private set; }
+        public bool RequiresOwnedSupport { get; private set; }
+        public bool NativeRecovery { get; private set; }
+        public bool MatchesWindowsSelector(double? refreshRate)
+        {
+            return refreshRate.HasValue &&
+                refreshRate.Value == WindowsRefreshRate;
+        }
+
+    }
+
     public sealed class DisplayRefreshMode
     {
         public DisplayRefreshMode(
-            int refreshRateHz,
+            DisplayModeDefinition definition,
             DetailedTiming timing,
-            bool experimental)
+            bool experimental,
+            uint expectedRefreshRateNumerator = 0U,
+            uint expectedRefreshRateDenominator = 0U)
         {
-            if (refreshRateHz <= 0)
+            if (definition == null)
             {
-                throw new ArgumentOutOfRangeException(nameof(refreshRateHz));
+                throw new ArgumentNullException(nameof(definition));
             }
 
-            Timing = timing ?? throw new ArgumentNullException(nameof(timing));
-            RefreshRateHz = refreshRateHz;
+            if (timing == null)
+            {
+                throw new ArgumentNullException(nameof(timing));
+            }
+
+            if ((expectedRefreshRateNumerator == 0U) !=
+                (expectedRefreshRateDenominator == 0U))
+            {
+                throw new ArgumentException(
+                    "An exact refresh rational must be complete or omitted.");
+            }
+
+            Definition = definition;
+            Timing = timing;
             Experimental = experimental;
+            ExpectedRefreshRateNumerator = expectedRefreshRateNumerator;
+            ExpectedRefreshRateDenominator = expectedRefreshRateDenominator;
         }
 
-        public int RefreshRateHz { get; private set; }
+        public DisplayModeDefinition Definition { get; private set; }
+
+        public int RefreshRateHz => Definition.WindowsRefreshRate;
 
         public DetailedTiming Timing { get; private set; }
 
         public bool Experimental { get; private set; }
+
+        public uint ExpectedRefreshRateNumerator { get; private set; }
+
+        public uint ExpectedRefreshRateDenominator { get; private set; }
+
+        public bool RequiresExactSignalValidation =>
+            ExpectedRefreshRateNumerator != 0U;
+
+        public bool MatchesSignal(
+            uint refreshRateNumerator,
+            uint refreshRateDenominator,
+            ulong pixelRate,
+            uint activeWidth,
+            uint activeHeight,
+            uint totalWidth,
+            uint totalHeight)
+        {
+            if (!RequiresExactSignalValidation ||
+                refreshRateNumerator == 0U ||
+                refreshRateDenominator == 0U)
+            {
+                return false;
+            }
+
+            return (ulong)refreshRateNumerator *
+                    ExpectedRefreshRateDenominator ==
+                    (ulong)refreshRateDenominator *
+                    ExpectedRefreshRateNumerator &&
+                pixelRate == (ulong)Timing.PixelClock10Khz * 10000UL &&
+                activeWidth == (uint)Timing.HorizontalActive &&
+                activeHeight == (uint)Timing.VerticalActive &&
+                totalWidth == (uint)Timing.HorizontalTotal &&
+                totalHeight == (uint)Timing.VerticalTotal;
+        }
     }
 
     public sealed class DisplayProfile

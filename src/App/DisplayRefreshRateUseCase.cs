@@ -6,7 +6,7 @@ using MacBookEco.Platform.Windows;
 namespace MacBookEco.App
 {
     /// <summary>
-    /// Executes reversible, watchdog-backed 48/58/60 Hz mode transitions.
+    /// Executes reversible, watchdog-backed 48/59.94/60 Hz mode transitions.
     /// </summary>
     internal sealed class DisplayRefreshRateUseCase
     {
@@ -59,19 +59,25 @@ namespace MacBookEco.App
             Func<DisplayModeConfirmationRequest, DisplayModeConfirmationDecision>
                 confirmation)
         {
-            if (!DisplayModeSelectionPolicy.IsReviewedRefreshRate(refreshRateHz))
+            DisplayModeDefinition requestedMode =
+                ProfileCatalog.GetMode(refreshRateHz);
+            if (requestedMode == null)
             {
                 return OptimizationActionResult.Unsupported(
                     OperationCode.InvalidRequest,
-                    "Only the reviewed 48/58 Hz and native 60 Hz modes are allowed.");
+                    "Only reviewed display modes are allowed: "
+                        + ProfileCatalog.ReviewedModeDisplayName
+                        + ".");
             }
 
             try
             {
                 StableDisplayTarget displayTarget;
+                DisplayRefreshMode installedMode;
                 OptimizationActionResult validation = _validator.Validate(
                     refreshRateHz,
-                    out displayTarget);
+                    out displayTarget,
+                    out installedMode);
                 if (validation != null)
                 {
                     return validation;
@@ -93,10 +99,16 @@ namespace MacBookEco.App
 
                 if (originalMode.RefreshRate == refreshRateHz)
                 {
+                    if (installedMode != null &&
+                        installedMode.RequiresExactSignalValidation)
+                    {
+                        VerifyExactSignal(installedMode, displayTarget);
+                    }
+
                     return OptimizationActionResult.Successful(
                         "The internal display is already "
-                        + originalMode.RefreshRate
-                        + " Hz.",
+                        + requestedMode.DisplayName
+                        + ".",
                         OperationCode.None,
                         false);
                 }
@@ -107,7 +119,7 @@ namespace MacBookEco.App
                 {
                     return OptimizationActionResult.Unsupported(
                         OperationCode.UnsupportedCapability,
-                        DisplayModeSelectionPolicy.IsEcoRefreshRate(refreshRateHz)
+                        requestedMode.RequiresOwnedSupport
                             ? "Windows has not exposed the requested Eco mode yet. "
                                 + "Restart Windows after installing or repairing "
                                 + "Eco display support."
@@ -147,9 +159,12 @@ namespace MacBookEco.App
                                 return _validator.ResolveActive(
                                     displayTarget.Identity).Endpoint.GdiDeviceName;
                             });
-                        if (refreshRateHz == 58)
+                        if (installedMode != null &&
+                            installedMode.RequiresExactSignalValidation)
                         {
-                            Verify58HzSignal(displayTarget.Identity);
+                            VerifyExactSignal(
+                                installedMode,
+                                displayTarget.Identity);
                         }
 
                         DisplayModeConfirmationDecision decision =
@@ -226,7 +241,7 @@ namespace MacBookEco.App
                             {
                                 return ReadCurrentModeForTarget(
                                     displayTarget.Identity,
-                                    refreshRateHz == 58);
+                                    installedMode);
                             },
                             delegate
                             {
@@ -268,7 +283,7 @@ namespace MacBookEco.App
 
         internal bool IsRefreshRateModeAvailable(int refreshRateHz)
         {
-            if (!DisplayModeSelectionPolicy.IsReviewedRefreshRate(refreshRateHz))
+            if (ProfileCatalog.GetMode(refreshRateHz) == null)
             {
                 return false;
             }
@@ -301,17 +316,18 @@ namespace MacBookEco.App
         private WindowsDisplayMode ReadCurrentModeForTarget(
             MonitorIdentity identity)
         {
-            return ReadCurrentModeForTarget(identity, false);
+            return ReadCurrentModeForTarget(identity, null);
         }
 
         private WindowsDisplayMode ReadCurrentModeForTarget(
             MonitorIdentity identity,
-            bool verify58HzSignal)
+            DisplayRefreshMode verifyMode)
         {
             StableDisplayTarget target = _validator.ResolveActive(identity);
-            if (verify58HzSignal)
+            if (verifyMode != null &&
+                verifyMode.RequiresExactSignalValidation)
             {
-                Verify58HzSignal(target);
+                VerifyExactSignal(verifyMode, target);
             }
 
             return _displayModes.GetCurrentMode(
@@ -320,15 +336,23 @@ namespace MacBookEco.App
                 target.RefreshRateDenominator);
         }
 
-        private void Verify58HzSignal(MonitorIdentity identity)
+        private void VerifyExactSignal(
+            DisplayRefreshMode mode,
+            MonitorIdentity identity)
         {
-            Verify58HzSignal(_validator.ResolveActive(identity));
+            VerifyExactSignal(mode, _validator.ResolveActive(identity));
         }
 
-        private static void Verify58HzSignal(StableDisplayTarget target)
+        private static void VerifyExactSignal(
+            DisplayRefreshMode mode,
+            StableDisplayTarget target)
         {
-            if (target == null ||
-                !IsExpected58HzSignal(
+            if (mode == null ||
+                !mode.RequiresExactSignalValidation ||
+                target == null ||
+                !mode.MatchesSignal(
+                    target.RefreshRateNumerator,
+                    target.RefreshRateDenominator,
                     target.PixelRate,
                     target.ActiveWidth,
                     target.ActiveHeight,
@@ -336,22 +360,12 @@ namespace MacBookEco.App
                     target.TotalHeight))
             {
                 throw new InvalidOperationException(
-                    "Windows did not read back the exact reviewed 58 Hz signal timing.");
+                    "Windows did not read back the exact reviewed "
+                        + (mode == null
+                            ? "display"
+                            : mode.Definition.DisplayName)
+                        + " signal timing.");
             }
-        }
-
-        internal static bool IsExpected58HzSignal(
-            ulong pixelRate,
-            uint activeWidth,
-            uint activeHeight,
-            uint totalWidth,
-            uint totalHeight)
-        {
-            return pixelRate == 373510000UL &&
-                activeWidth == 3072U &&
-                activeHeight == 1920U &&
-                totalWidth == 3152U &&
-                totalHeight == 2048U;
         }
 
         private static DisplayModeKey CreateRefreshOnlyTarget(
@@ -544,14 +558,17 @@ namespace MacBookEco.App
                         string.Empty);
             }
 
+            DisplayModeDefinition verifiedMode = ProfileCatalog.GetMode(
+                refreshRateHz);
             return OptimizationActionResult.Successful(
                 "Internal display is now "
                     + verified.Width
                     + "x"
                     + verified.Height
                     + " @ "
-                    + verified.RefreshRate
-                    + " Hz.",
+                    + (verifiedMode == null
+                        ? verified.RefreshRate + " Hz."
+                        : verifiedMode.DisplayName + "."),
                 OperationCode.None,
                 false);
         }

@@ -202,12 +202,6 @@ namespace MacBookEco.Telemetry
         // profile without exporting an exact per-device EDID fingerprint.
         public string TargetSignature { get; private set; }
 
-        public bool IsRefreshRate(double expected)
-        {
-            return RefreshRateHz.HasValue
-                && Math.Abs(RefreshRateHz.Value - expected) < 0.75;
-        }
-
         public static DisplayTelemetry Unavailable(string detail)
         {
             return new DisplayTelemetry(

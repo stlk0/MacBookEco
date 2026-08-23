@@ -16,16 +16,16 @@ exactly. Other systems remain diagnostic-only.
 | GPU | AMD Radeon Pro 5300M or 5500M (`VEN_1002&DEV_7340`) |
 | Tested Radeon Pro 5300M driver | `30.0.13045.22003` |
 | Tested Radeon Pro 5500M driver | `26.20.13003.5002` |
-| Added modes | 48 Hz and 58 Hz |
+| Added modes | 48 Hz and 60 Hz Eco (`60000/1001`, about 59.940 Hz) |
 | 48 Hz DTD | `DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A` |
-| 58 Hz DTD | `E7 91 00 50 C0 80 80 70 08 20 98 08 59 D7 10 00 00 1A` |
-| Pixel clocks | `373.40 MHz` at 48 Hz; native `373.51 MHz` at 58 Hz |
+| 60 Hz Eco DTD | `20 92 00 50 C0 80 3C 70 08 20 98 08 59 D7 10 00 00 1A` |
+| Pixel clocks | `373.40 MHz` at 48 Hz; `374.08 MHz` at 60 Hz Eco |
 
 The model, panel, normalized original EDID, native timing, dimensions, and GPU
 device ID must match. A different driver version produces a warning rather than
 changing the reviewed timing.
 
-The 58 Hz mode is hardware-verified for the primary Radeon Pro 5300M profile
+The 60 Hz Eco mode is hardware-verified for the primary Radeon Pro 5300M profile
 (`CDA0...F3F5`). It is selectable but marked experimental for the alternate
 5300M and 5500M profiles. Every transition retains exact CCD signal read-back,
 confirmation, and watchdog rollback.

@@ -35,7 +35,20 @@ namespace MacBookEco.App
             int refreshRateHz,
             out StableDisplayTarget displayTarget)
         {
+            DisplayRefreshMode installedMode;
+            return Validate(
+                refreshRateHz,
+                out displayTarget,
+                out installedMode);
+        }
+
+        public OptimizationActionResult Validate(
+            int refreshRateHz,
+            out StableDisplayTarget displayTarget,
+            out DisplayRefreshMode installedMode)
+        {
             displayTarget = null;
+            installedMode = null;
             WindowsHardwareSnapshot hardware = _discovery.Discover();
             if (hardware == null)
             {
@@ -79,11 +92,12 @@ namespace MacBookEco.App
                     exception.Message);
             }
 
-            // Native 60 Hz is a recovery action. Entering either Eco mode
+            // Native 60 Hz is a recovery action. Entering an owned Eco mode
             // additionally requires exact compiled override bytes for this
             // panel. This accepts the recovery-only legacy profile for 48 Hz
-            // but never treats it as authorization for 58 Hz.
-            if (DisplayModeSelectionPolicy.IsEcoRefreshRate(refreshRateHz))
+            // but never treats it as authorization for 60 Hz Eco.
+            DisplayModeDefinition mode = ProfileCatalog.GetMode(refreshRateHz);
+            if (mode != null && mode.RequiresOwnedSupport)
             {
                 try
                 {
@@ -100,6 +114,15 @@ namespace MacBookEco.App
                             OperationCode.UnsupportedCapability,
                             "No exact installed Eco display profile matches this "
                                 + "Mac, panel, and requested refresh rate.");
+                    }
+
+                    installedMode = profile.GetTargetMode(refreshRateHz);
+                    if (installedMode == null)
+                    {
+                        return OptimizationActionResult.Unsupported(
+                            OperationCode.UnsupportedCapability,
+                            "The installed Eco display profile does not contain "
+                                + "the requested mode.");
                     }
                 }
                 catch (Exception exception)

@@ -49,7 +49,10 @@ namespace MacBookEco.Tests.Core
         private const string Exact48Dtd =
             "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A";
 
-        private const string Exact58Dtd =
+        private const string ExactEco60Dtd =
+            "20 92 00 50 C0 80 3C 70 08 20 98 08 59 D7 10 00 00 1A";
+
+        private const string LegacyExact58Dtd =
             "E7 91 00 50 C0 80 80 70 08 20 98 08 59 D7 10 00 00 1A";
 
         internal static TestCase[] CreateCases()
@@ -61,8 +64,11 @@ namespace MacBookEco.Tests.Core
                     ParseOriginalEdid),
                 Test("Detailed timing round-trips byte for byte", DetailedTimingRoundTrip),
                 Test(
-                    "Exact 48 and 58 Hz DTDs use both free slots",
+                    "Exact 48 Hz and 60 Hz Eco DTDs use both free slots",
                     InsertExactEcoModes),
+                Test(
+                    "Display mode registry drives every current profile",
+                    DisplayModeRegistryDrivesProfiles),
                 Test(
                     "Normalized signature is stable after managed insertion",
                     NormalizedSignature),
@@ -76,6 +82,9 @@ namespace MacBookEco.Tests.Core
                 Test(
                     "Legacy 48 Hz profile remains recovery-only",
                     LegacyProfileRemainsRecoveryOnly),
+                Test(
+                    "Legacy 58 Hz profile remains owned for recovery",
+                    Legacy58HzProfileRemainsOwned),
                 Test(
                     "Alternate APPA044 EDID selects its exact profile",
                     AlternateAppa044ProfileMatches),
@@ -176,12 +185,12 @@ namespace MacBookEco.Tests.Core
             Check.Near(373.40, target.PixelClockMegahertz, 0.001);
             Check.Near(48.000189, target.RefreshRateHertz, 0.00001);
 
-            var target58 = DetailedTiming.ParseHex(Exact58Dtd);
-            Check.Equal(3152, target58.HorizontalTotal);
-            Check.Equal(2048, target58.VerticalTotal);
-            Check.Equal(79, target58.VerticalBackPorch);
-            Check.Near(373.51, target58.PixelClockMegahertz, 0.001);
-            Check.Near(57.861018, target58.RefreshRateHertz, 0.00001);
+            var targetEco = DetailedTiming.ParseHex(ExactEco60Dtd);
+            Check.Equal(3152, targetEco.HorizontalTotal);
+            Check.Equal(1980, targetEco.VerticalTotal);
+            Check.Equal(11, targetEco.VerticalBackPorch);
+            Check.Near(374.08, targetEco.PixelClockMegahertz, 0.001);
+            Check.Near(59.939496, targetEco.RefreshRateHertz, 0.00001);
         }
 
         private static void InsertExactEcoModes()
@@ -189,10 +198,10 @@ namespace MacBookEco.Tests.Core
             var original = CreateOriginal();
             var originalBytes = original.ToByteArray();
             var target48 = DetailedTiming.ParseHex(Exact48Dtd);
-            var target58 = DetailedTiming.ParseHex(Exact58Dtd);
+            var targetEco = DetailedTiming.ParseHex(ExactEco60Dtd);
             var modified = original
                 .InsertDetailedTiming(target48)
-                .InsertDetailedTiming(target58);
+                .InsertDetailedTiming(targetEco);
 
             Check.BytesEqual(
                 original.PreferredTiming.ToByteArray(),
@@ -201,10 +210,10 @@ namespace MacBookEco.Tests.Core
                 target48.ToByteArray(),
                 modified.GetDetailedTiming(2).ToByteArray());
             Check.BytesEqual(
-                target58.ToByteArray(),
+                targetEco.ToByteArray(),
                 modified.GetDetailedTiming(3).ToByteArray());
             Check.True(modified.ContainsDetailedTiming(target48));
-            Check.True(modified.ContainsDetailedTiming(target58));
+            Check.True(modified.ContainsDetailedTiming(targetEco));
             Check.Equal(0, modified.CountFreeDescriptors());
             Check.True(EdidBaseBlock.HasValidChecksum(modified.ToByteArray()));
             Check.Equal(1, (int)modified.ExtensionBlockCount);
@@ -214,7 +223,7 @@ namespace MacBookEco.Tests.Core
             Check.BytesEqual(
                 modified.ToByteArray(),
                 modified.InsertDetailedTiming(target48)
-                    .InsertDetailedTiming(target58)
+                    .InsertDetailedTiming(targetEco)
                     .ToByteArray());
         }
 
@@ -237,7 +246,7 @@ namespace MacBookEco.Tests.Core
 
             EdidBaseBlock staleEco = original
                 .InsertDetailedTiming(DetailedTiming.ParseHex(Exact48Dtd))
-                .InsertDetailedTiming(DetailedTiming.ParseHex(Exact58Dtd));
+                .InsertDetailedTiming(DetailedTiming.ParseHex(ExactEco60Dtd));
             Check.True(staleEco.TryRecoverExactOriginal(
                 originalFingerprint,
                 out recovered));
@@ -446,14 +455,14 @@ namespace MacBookEco.Tests.Core
             Check.True(installed.ContainsDetailedTiming(
                 selected.Profile.GetTargetMode(48).Timing));
             Check.True(installed.ContainsDetailedTiming(
-                selected.Profile.GetTargetMode(58).Timing));
-            Check.False(selected.Profile.GetTargetMode(58).Experimental);
+                selected.Profile.GetTargetMode(59).Timing));
+            Check.False(selected.Profile.GetTargetMode(59).Experimental);
             Check.Equal(
                 selected.Profile,
                 ProfileCatalog.FindExactInstalledProfile(
                     hardware,
                     installed.ToByteArray(),
-                    58));
+                    59));
 
             var otherDriver = new HardwareSnapshot(
                 "Apple Inc.",
@@ -467,6 +476,59 @@ namespace MacBookEco.Tests.Core
             var warningMatch = selected.Profile.Match(otherDriver);
             Check.True(warningMatch.HardwareSupported);
             Check.Equal(1, warningMatch.Warnings.Count);
+        }
+
+        private static void DisplayModeRegistryDrivesProfiles()
+        {
+            Check.Equal(3, ProfileCatalog.Modes.Count);
+            Check.Equal(
+                59,
+                ProfileCatalog.EcoMode.WindowsRefreshRate);
+            DisplayRefreshMode ecoProfileMode =
+                ProfileCatalog.All[0].GetTargetMode(
+                    ProfileCatalog.EcoMode.WindowsRefreshRate);
+            Check.Equal(
+                60000U,
+                ecoProfileMode.ExpectedRefreshRateNumerator);
+            Check.Equal(
+                1001U,
+                ecoProfileMode.ExpectedRefreshRateDenominator);
+            Check.Equal(
+                ProfileCatalog.EcoMode,
+                ProfileCatalog.GetModeForWindowsSelector(59.0));
+            Check.True(
+                ProfileCatalog.GetModeForWindowsSelector(59.94) == null);
+
+            for (var modeIndex = 0;
+                modeIndex < ProfileCatalog.Modes.Count;
+                modeIndex++)
+            {
+                DisplayModeDefinition definition =
+                    ProfileCatalog.Modes[modeIndex];
+                Check.True(
+                    DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(
+                        definition.WindowsRefreshRate));
+
+                for (var profileIndex = 0;
+                    profileIndex < ProfileCatalog.All.Count;
+                    profileIndex++)
+                {
+                    DisplayRefreshMode profileMode =
+                        ProfileCatalog.All[profileIndex].GetTargetMode(
+                            definition.WindowsRefreshRate);
+                    if (definition.RequiresOwnedSupport)
+                    {
+                        Check.NotNull(profileMode);
+                        Check.True(ReferenceEquals(
+                            definition,
+                            profileMode.Definition));
+                    }
+                    else
+                    {
+                        Check.True(profileMode == null);
+                    }
+                }
+            }
         }
 
         private static void AlternateAppa044ProfileMatches()
@@ -489,8 +551,8 @@ namespace MacBookEco.Tests.Core
             Check.True(
                 selected.Profile.BuildOverride(hardware)
                     .ContainsDetailedTiming(
-                        selected.Profile.GetTargetMode(58).Timing));
-            Check.True(selected.Profile.GetTargetMode(58).Experimental);
+                        selected.Profile.GetTargetMode(59).Timing));
+            Check.True(selected.Profile.GetTargetMode(59).Experimental);
         }
 
         private static void LegacyProfileRemainsRecoveryOnly()
@@ -519,6 +581,27 @@ namespace MacBookEco.Tests.Core
                 hardware,
                 legacyOverride,
                 58) == null);
+        }
+
+        private static void Legacy58HzProfileRemainsOwned()
+        {
+            HardwareSnapshot hardware = CreateKnownHardware(CreateOriginal());
+            DisplayProfile legacy = ProfileCatalog.GetById(
+                "macbookpro16-1-appa044-48-58hz-v2");
+
+            Check.NotNull(legacy);
+            Check.NotNull(legacy.GetTargetMode(58));
+            Check.True(legacy.GetTargetMode(59) == null);
+            byte[] legacyOverride = legacy.BuildOverride(hardware).ToByteArray();
+            Check.Equal(
+                legacy,
+                ProfileCatalog.FindExactInstalledProfile(
+                    hardware,
+                    legacyOverride,
+                    58));
+            Check.BytesEqual(
+                DetailedTiming.ParseHex(LegacyExact58Dtd).ToByteArray(),
+                legacy.GetTargetMode(58).Timing.ToByteArray());
         }
 
         private static void Radeon5500Appa044ProfileMatches()
@@ -551,8 +634,8 @@ namespace MacBookEco.Tests.Core
             Check.True(
                 selected.Profile.BuildOverride(hardware)
                     .ContainsDetailedTiming(
-                        selected.Profile.GetTargetMode(58).Timing));
-            Check.True(selected.Profile.GetTargetMode(58).Experimental);
+                        selected.Profile.GetTargetMode(59).Timing));
+            Check.True(selected.Profile.GetTargetMode(59).Experimental);
         }
 
         private static void UnknownProfileRejected()
@@ -933,14 +1016,13 @@ namespace MacBookEco.Tests.Core
         private static void RefreshOnlyModeSelectionPreservesCurrentKey()
         {
             Check.True(DisplayModeSelectionPolicy.IsReviewedRefreshRate(48));
-            Check.True(DisplayModeSelectionPolicy.IsReviewedRefreshRate(58));
+            Check.True(DisplayModeSelectionPolicy.IsReviewedRefreshRate(59));
             Check.True(DisplayModeSelectionPolicy.IsReviewedRefreshRate(60));
-            Check.False(DisplayModeSelectionPolicy.IsReviewedRefreshRate(59));
-            Check.True(DisplayModeSelectionPolicy.IsEcoRefreshRate(48));
-            Check.True(DisplayModeSelectionPolicy.IsEcoRefreshRate(58));
-            Check.False(DisplayModeSelectionPolicy.IsEcoRefreshRate(60));
+            Check.False(DisplayModeSelectionPolicy.IsReviewedRefreshRate(58));
             Check.True(
                 DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(59));
+            Check.True(
+                DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(58));
             Check.True(
                 DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(61));
 
