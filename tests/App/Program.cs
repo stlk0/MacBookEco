@@ -1696,12 +1696,18 @@ namespace MacBookEco.Tests.App
                 false,
                 false,
                 true));
-            Check.Equal(1, page.DisplayMode.Items.Count);
-            DisplayModeChoice availableMode =
+            Check.Equal(2, page.DisplayMode.Items.Count);
+            DisplayModeChoice currentEcoMode =
                 page.DisplayMode.Items[0] as DisplayModeChoice;
+            DisplayModeChoice availableNativeMode =
+                page.DisplayMode.Items[1] as DisplayModeChoice;
             Check.That(
-                availableMode != null && availableMode.RefreshRateHz == 60,
-                "the selector exposed an Eco mode not enumerated by Windows");
+                currentEcoMode != null &&
+                    currentEcoMode.RefreshRateHz == 59 &&
+                    availableNativeMode != null &&
+                    availableNativeMode.RefreshRateHz == 60 &&
+                    !page.DisplayApplyButton.Enabled,
+                "the selector did not keep an external Eco mode read-only");
 
             controller.UpdateOptimizationState(null);
             controller.UpdateDisplay(null);

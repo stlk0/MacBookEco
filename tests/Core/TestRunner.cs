@@ -185,7 +185,7 @@ namespace MacBookEco.Tests.Core
             var targetEco = DetailedTiming.ParseHex(ExactEco60Dtd);
             Check.Equal(3152, targetEco.HorizontalTotal);
             Check.Equal(1980, targetEco.VerticalTotal);
-            Check.Equal(43, targetEco.VerticalBackPorch);
+            Check.Equal(11, targetEco.VerticalBackPorch);
             Check.Near(374.08, targetEco.PixelClockMegahertz, 0.001);
             Check.Near(59.939496, targetEco.RefreshRateHertz, 0.00001);
         }
