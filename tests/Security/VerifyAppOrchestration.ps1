@@ -112,13 +112,32 @@ Assert-That -Condition $actionServiceComposition.Contains('startupRecovery') `
 # service contract, in a fixed display-first recovery sequence.
 foreach ($required in @(
         '_actions.InstallDisplaySupport()',
-        '_actions.SetDisplayRefreshRate(60, displayConfirmation)',
         '_actions.RemoveDisplaySupport()',
         '_actions.RestoreCpuPower()'
     )) {
     Assert-That -Condition $uninstallRecovery.Contains($required) -Message (
         "uninstall recovery is missing fixed action '$required'.")
 }
+$displayRecoveryStart = $uninstallRecovery.IndexOf(
+    '_actions.SetDisplayRefreshRate(',
+    [System.StringComparison]::Ordinal)
+Assert-That -Condition ($displayRecoveryStart -ge 0) -Message (
+    'uninstall recovery is missing its fixed display action.')
+$displayRecoveryEnd = $uninstallRecovery.IndexOf(
+    ');',
+    $displayRecoveryStart,
+    [System.StringComparison]::Ordinal)
+Assert-That -Condition ($displayRecoveryEnd -gt $displayRecoveryStart) -Message (
+    'the uninstall display recovery call has no bounded argument list.')
+$displayRecoveryCall = $uninstallRecovery.Substring(
+    $displayRecoveryStart,
+    $displayRecoveryEnd - $displayRecoveryStart)
+Assert-That -Condition $displayRecoveryCall.Contains(
+    'ProfileCatalog.NativeMode.WindowsRefreshRate') -Message (
+    'uninstall recovery must use the catalog-owned native recovery mode.')
+Assert-That -Condition $displayRecoveryCall.Contains(
+    'displayConfirmation') -Message (
+    'uninstall display recovery must retain visual confirmation.')
 Assert-That -Condition (-not $uninstallRecovery.Contains(
     '_actions.ApplyCpuPreset(')) -Message (
     'uninstall recovery must never apply a new CPU preset.')
