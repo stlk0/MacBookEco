@@ -18,12 +18,21 @@ namespace MacBookEco.Core
             "macbookpro16-1-appa044-4b2ea063-48hz";
 
         public const string MacBookPro161Appa044EcoModesProfileId =
-            "macbookpro16-1-appa044-48-58hz-v2";
+            "macbookpro16-1-appa044-48-60eco-v3";
 
         public const string MacBookPro161Appa044Faf4EcoModesProfileId =
-            "macbookpro16-1-appa044-faf4a9c1-48-58hz-v2";
+            "macbookpro16-1-appa044-faf4a9c1-48-60eco-v3";
 
         public const string MacBookPro161Appa0444b2eEcoModesProfileId =
+            "macbookpro16-1-appa044-4b2ea063-48-60eco-v3";
+
+        private const string LegacyMacBookPro161Appa044EcoModesProfileId =
+            "macbookpro16-1-appa044-48-58hz-v2";
+
+        private const string LegacyMacBookPro161Appa044Faf4EcoModesProfileId =
+            "macbookpro16-1-appa044-faf4a9c1-48-58hz-v2";
+
+        private const string LegacyMacBookPro161Appa0444b2eEcoModesProfileId =
             "macbookpro16-1-appa044-4b2ea063-48-58hz-v2";
 
         private static readonly DetailedTiming NativeAppa044Timing =
@@ -34,58 +43,80 @@ namespace MacBookEco.Core
             DetailedTiming.ParseHex(
                 "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A");
 
-        private static readonly DetailedTiming Appa04458HzTiming =
+        private static readonly DetailedTiming Appa044Eco60HzTiming =
+            DetailedTiming.ParseHex(
+                "20 92 00 50 C0 80 3C 70 08 20 98 08 59 D7 10 00 00 1A");
+
+        private static readonly DetailedTiming LegacyAppa04458HzTiming =
             DetailedTiming.ParseHex(
                 "E7 91 00 50 C0 80 80 70 08 20 98 08 59 D7 10 00 00 1A");
 
         private static readonly ReadOnlyCollection<DisplayProfile> Profiles =
-            CreateAppa044Profiles(true);
+            CreateAppa044Profiles(true, false);
 
-        // These exact one-descriptor profiles remain compiled only so an
-        // existing 48 Hz journal can still be verified and safely restored
-        // after an app update. New installs never select them.
+        // Historical app-owned profiles remain compiled only so existing
+        // journals can still be verified and safely restored after an update.
+        // New installs never select them.
         private static readonly ReadOnlyCollection<DisplayProfile> LegacyProfiles =
-            CreateAppa044Profiles(false);
+            CreateLegacyProfiles();
 
         public static ReadOnlyCollection<DisplayProfile> All => Profiles;
 
         private static ReadOnlyCollection<DisplayProfile> CreateAppa044Profiles(
-            bool include58Hz)
+            bool includeEcoMode,
+            bool useLegacy58Hz)
         {
             return Array.AsReadOnly(
                 new[]
                 {
                     CreateAppa044Profile(
-                        include58Hz
-                            ? MacBookPro161Appa044EcoModesProfileId
+                        includeEcoMode
+                            ? useLegacy58Hz
+                                ? LegacyMacBookPro161Appa044EcoModesProfileId
+                                : MacBookPro161Appa044EcoModesProfileId
                             : MacBookPro161Appa044ProfileId,
                         "MacBook Pro 16-inch 2019 / APPA044",
                         "CDA0E18080DE8CAC744C66A5374A53CBBA1999115FA5FE2DBD949980649AF3F5",
                         "AMD Radeon Pro 5300M",
                         "30.0.13045.22003",
                         false,
-                        include58Hz),
+                        includeEcoMode,
+                        useLegacy58Hz),
                     CreateAppa044Profile(
-                        include58Hz
-                            ? MacBookPro161Appa044Faf4EcoModesProfileId
+                        includeEcoMode
+                            ? useLegacy58Hz
+                                ? LegacyMacBookPro161Appa044Faf4EcoModesProfileId
+                                : MacBookPro161Appa044Faf4EcoModesProfileId
                             : MacBookPro161Appa044Faf4ProfileId,
                         "MacBook Pro 16-inch 2019 / APPA044 FAF4A9C1",
                         "FAF4A9C16A6B394896D75DAA3280D84A61744EA07ED2F7CC21E6CFBCF1B4D2DF",
                         "AMD Radeon Pro 5300M",
                         string.Empty,
-                        include58Hz,
-                        include58Hz),
+                        includeEcoMode,
+                        includeEcoMode,
+                        useLegacy58Hz),
                     CreateAppa044Profile(
-                        include58Hz
-                            ? MacBookPro161Appa0444b2eEcoModesProfileId
+                        includeEcoMode
+                            ? useLegacy58Hz
+                                ? LegacyMacBookPro161Appa0444b2eEcoModesProfileId
+                                : MacBookPro161Appa0444b2eEcoModesProfileId
                             : MacBookPro161Appa0444b2eProfileId,
                         "MacBook Pro 16-inch 2019 / APPA044 4B2EA063",
                         "4B2EA0633F9C80C074E8F06E891B5F179444E0A417CD60AFBD190C732840B7EC",
                         "AMD Radeon Pro 5500M",
                         "26.20.13003.5002",
-                        include58Hz,
-                        include58Hz)
+                        includeEcoMode,
+                        includeEcoMode,
+                        useLegacy58Hz)
                 });
+        }
+
+        private static ReadOnlyCollection<DisplayProfile> CreateLegacyProfiles()
+        {
+            var profiles = new List<DisplayProfile>();
+            profiles.AddRange(CreateAppa044Profiles(true, true));
+            profiles.AddRange(CreateAppa044Profiles(false, false));
+            return profiles.AsReadOnly();
         }
 
         private static DisplayProfile CreateAppa044Profile(
@@ -94,8 +125,9 @@ namespace MacBookEco.Core
             string normalizedEdidSignature,
             string verifiedGpuName,
             string verifiedDriverVersion,
-            bool experimental58Hz,
-            bool include58Hz)
+            bool experimentalEcoMode,
+            bool includeEcoMode,
+            bool useLegacy58Hz)
         {
             var modes = new List<DisplayRefreshMode>
             {
@@ -104,12 +136,14 @@ namespace MacBookEco.Core
                     Appa04448HzTiming,
                     false)
             };
-            if (include58Hz)
+            if (includeEcoMode)
             {
                 modes.Add(new DisplayRefreshMode(
-                    58,
-                    Appa04458HzTiming,
-                    experimental58Hz));
+                    useLegacy58Hz ? 58 : 59,
+                    useLegacy58Hz
+                        ? LegacyAppa04458HzTiming
+                        : Appa044Eco60HzTiming,
+                    experimentalEcoMode));
             }
 
             return new DisplayProfile(
@@ -315,14 +349,14 @@ namespace MacBookEco.Core
             text.AppendLine(
                 "Hardware supported: "
                 + (selection.HardwareSupported ? "True" : "False"));
-            DisplayRefreshMode mode58 = selection.Profile == null
+            DisplayRefreshMode ecoMode = selection.Profile == null
                 ? null
-                : selection.Profile.GetTargetMode(58);
+                : selection.Profile.GetTargetMode(59);
             text.AppendLine(
-                "58 Hz validation: "
-                + (mode58 == null
+                "60 Hz Eco validation: "
+                + (ecoMode == null
                     ? "Unavailable"
-                    : mode58.Experimental
+                    : ecoMode.Experimental
                         ? "Experimental"
                         : "Hardware-verified"));
 

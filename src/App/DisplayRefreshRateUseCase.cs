@@ -6,7 +6,7 @@ using MacBookEco.Platform.Windows;
 namespace MacBookEco.App
 {
     /// <summary>
-    /// Executes reversible, watchdog-backed 48/58/60 Hz mode transitions.
+    /// Executes reversible, watchdog-backed 48/59.94/60 Hz mode transitions.
     /// </summary>
     internal sealed class DisplayRefreshRateUseCase
     {
@@ -63,7 +63,8 @@ namespace MacBookEco.App
             {
                 return OptimizationActionResult.Unsupported(
                     OperationCode.InvalidRequest,
-                    "Only the reviewed 48/58 Hz and native 60 Hz modes are allowed.");
+                    "Only the reviewed 48 Hz, 60 Hz Eco, and native 60 Hz "
+                        + "modes are allowed.");
             }
 
             try
@@ -93,10 +94,16 @@ namespace MacBookEco.App
 
                 if (originalMode.RefreshRate == refreshRateHz)
                 {
+                    if (refreshRateHz == 59)
+                    {
+                        VerifyEco60HzSignal(displayTarget);
+                    }
+
                     return OptimizationActionResult.Successful(
                         "The internal display is already "
-                        + originalMode.RefreshRate
-                        + " Hz.",
+                        + (refreshRateHz == 59
+                            ? "60 Hz Eco."
+                            : originalMode.RefreshRate + " Hz."),
                         OperationCode.None,
                         false);
                 }
@@ -147,9 +154,9 @@ namespace MacBookEco.App
                                 return _validator.ResolveActive(
                                     displayTarget.Identity).Endpoint.GdiDeviceName;
                             });
-                        if (refreshRateHz == 58)
+                        if (refreshRateHz == 59)
                         {
-                            Verify58HzSignal(displayTarget.Identity);
+                            VerifyEco60HzSignal(displayTarget.Identity);
                         }
 
                         DisplayModeConfirmationDecision decision =
@@ -226,7 +233,7 @@ namespace MacBookEco.App
                             {
                                 return ReadCurrentModeForTarget(
                                     displayTarget.Identity,
-                                    refreshRateHz == 58);
+                                    refreshRateHz == 59);
                             },
                             delegate
                             {
@@ -306,12 +313,12 @@ namespace MacBookEco.App
 
         private WindowsDisplayMode ReadCurrentModeForTarget(
             MonitorIdentity identity,
-            bool verify58HzSignal)
+            bool verifyEco60HzSignal)
         {
             StableDisplayTarget target = _validator.ResolveActive(identity);
-            if (verify58HzSignal)
+            if (verifyEco60HzSignal)
             {
-                Verify58HzSignal(target);
+                VerifyEco60HzSignal(target);
             }
 
             return _displayModes.GetCurrentMode(
@@ -320,15 +327,17 @@ namespace MacBookEco.App
                 target.RefreshRateDenominator);
         }
 
-        private void Verify58HzSignal(MonitorIdentity identity)
+        private void VerifyEco60HzSignal(MonitorIdentity identity)
         {
-            Verify58HzSignal(_validator.ResolveActive(identity));
+            VerifyEco60HzSignal(_validator.ResolveActive(identity));
         }
 
-        private static void Verify58HzSignal(StableDisplayTarget target)
+        private static void VerifyEco60HzSignal(StableDisplayTarget target)
         {
             if (target == null ||
-                !IsExpected58HzSignal(
+                !IsExpectedEco60HzSignal(
+                    target.RefreshRateNumerator,
+                    target.RefreshRateDenominator,
                     target.PixelRate,
                     target.ActiveWidth,
                     target.ActiveHeight,
@@ -336,22 +345,29 @@ namespace MacBookEco.App
                     target.TotalHeight))
             {
                 throw new InvalidOperationException(
-                    "Windows did not read back the exact reviewed 58 Hz signal timing.");
+                    "Windows did not read back the exact reviewed 60 Hz Eco "
+                        + "signal timing.");
             }
         }
 
-        internal static bool IsExpected58HzSignal(
+        internal static bool IsExpectedEco60HzSignal(
+            uint refreshRateNumerator,
+            uint refreshRateDenominator,
             ulong pixelRate,
             uint activeWidth,
             uint activeHeight,
             uint totalWidth,
             uint totalHeight)
         {
-            return pixelRate == 373510000UL &&
+            return refreshRateNumerator != 0U &&
+                refreshRateDenominator != 0U &&
+                refreshRateNumerator * 1001UL ==
+                    refreshRateDenominator * 60000UL &&
+                pixelRate == 374080000UL &&
                 activeWidth == 3072U &&
                 activeHeight == 1920U &&
                 totalWidth == 3152U &&
-                totalHeight == 2048U;
+                totalHeight == 1980U;
         }
 
         private static DisplayModeKey CreateRefreshOnlyTarget(
@@ -550,8 +566,9 @@ namespace MacBookEco.App
                     + "x"
                     + verified.Height
                     + " @ "
-                    + verified.RefreshRate
-                    + " Hz.",
+                    + (refreshRateHz == 59
+                        ? "60 Hz Eco."
+                        : verified.RefreshRate + " Hz."),
                 OperationCode.None,
                 false);
         }

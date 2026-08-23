@@ -82,7 +82,7 @@ namespace MacBookEco.App
             // Native 60 Hz is a recovery action. Entering either Eco mode
             // additionally requires exact compiled override bytes for this
             // panel. This accepts the recovery-only legacy profile for 48 Hz
-            // but never treats it as authorization for 58 Hz.
+            // but never treats it as authorization for 60 Hz Eco.
             if (DisplayModeSelectionPolicy.IsEcoRefreshRate(refreshRateHz))
             {
                 try

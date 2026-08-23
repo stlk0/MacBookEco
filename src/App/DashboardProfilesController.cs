@@ -27,7 +27,7 @@ namespace MacBookEco.App
         private bool _displaySelectionDirty;
         private bool _mutationControlsEnabled = true;
         private bool? _lastShow48Hz;
-        private bool? _lastShow58Hz;
+        private bool? _lastShowEcoHz;
         private bool? _lastShow60Hz;
 
         public DashboardProfilesController(object customProfileItem)
@@ -73,7 +73,9 @@ namespace MacBookEco.App
             }
             if (!_displaySelectionDirty && _display.RefreshRateHz.HasValue)
             {
-                SelectDisplayMode((int)Math.Round(_display.RefreshRateHz.Value));
+                SelectDisplayMode(_display.IsRefreshRate(59.0)
+                    ? 59
+                    : (int)Math.Round(_display.RefreshRateHz.Value));
             }
             ApplyDisplaySupportPresentation();
             UpdateCombinedProfileState();
@@ -319,8 +321,8 @@ namespace MacBookEco.App
             int? selectedRefreshRate = SelectedDisplayRefreshRate();
             bool canApply = selectedRefreshRate == 48
                 ? displayState.CanSelect48Hz
-                : selectedRefreshRate == 58
-                    ? displayState.CanSelect58Hz
+                : selectedRefreshRate == 59
+                    ? displayState.CanSelectEcoHz
                     : selectedRefreshRate == 60 && displayState.CanSelect60Hz;
             _page.DisplayMode.Enabled = _mutationControlsEnabled &&
                 _page.DisplayMode.Items.Count > 0;
@@ -502,7 +504,7 @@ namespace MacBookEco.App
             return DisplaySupportUiPolicy.Evaluate(
                 _optimizationState,
                 _display.IsRefreshRate(48.0),
-                _display.IsRefreshRate(58.0),
+                _display.IsRefreshRate(59.0),
                 _display.IsRefreshRate(60.0),
                 _mutationControlsEnabled);
         }
@@ -510,14 +512,14 @@ namespace MacBookEco.App
         private void UpdateDisplayModeChoices(DisplaySupportUiState state)
         {
             if (_lastShow48Hz == state.Show48Hz &&
-                _lastShow58Hz == state.Show58Hz &&
+                _lastShowEcoHz == state.ShowEcoHz &&
                 _lastShow60Hz == state.Show60Hz)
             {
                 return;
             }
 
             _lastShow48Hz = state.Show48Hz;
-            _lastShow58Hz = state.Show58Hz;
+            _lastShowEcoHz = state.ShowEcoHz;
             _lastShow60Hz = state.Show60Hz;
             int? selected = SelectedDisplayRefreshRate();
 
@@ -531,10 +533,10 @@ namespace MacBookEco.App
                         new DisplayModeChoice(48, "48 Hz"));
                 }
 
-                if (state.Show58Hz)
+                if (state.ShowEcoHz)
                 {
                     _page.DisplayMode.Items.Add(
-                        new DisplayModeChoice(58, "58 Hz"));
+                        new DisplayModeChoice(59, "60 Hz Eco"));
                 }
 
                 if (state.Show60Hz)
@@ -550,7 +552,9 @@ namespace MacBookEco.App
 
             if (!selected.HasValue && _display.RefreshRateHz.HasValue)
             {
-                selected = (int)Math.Round(_display.RefreshRateHz.Value);
+                selected = _display.IsRefreshRate(59.0)
+                    ? 59
+                    : (int)Math.Round(_display.RefreshRateHz.Value);
             }
 
             if (selected.HasValue)

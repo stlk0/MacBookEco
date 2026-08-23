@@ -15,9 +15,9 @@ retry the same action only after checking the reported live state.
 
 ## Display mode
 
-For an unconfirmed 48/58/60 Hz change, use the rollback option or wait for the
-countdown. The watchdog restores the saved mode after re-identifying the same
-internal panel.
+For an unconfirmed 48 Hz/60 Hz Eco/native 60 Hz change, use the rollback option
+or wait for the countdown. The watchdog restores the saved mode after
+re-identifying the same internal panel.
 
 If Windows display topology changed and automatic rollback could not identify
 the panel, select the native mode in Windows display settings and save the

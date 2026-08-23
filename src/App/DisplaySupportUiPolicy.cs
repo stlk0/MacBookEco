@@ -11,10 +11,10 @@ namespace MacBookEco.App
     internal sealed class DisplaySupportUiState
     {
         internal bool CanSelect48Hz;
-        internal bool CanSelect58Hz;
+        internal bool CanSelectEcoHz;
         internal bool CanSelect60Hz;
         internal bool Show48Hz;
-        internal bool Show58Hz;
+        internal bool ShowEcoHz;
         internal bool Show60Hz;
         internal bool CanInstall;
         internal bool CanRemove;
@@ -28,7 +28,7 @@ namespace MacBookEco.App
         internal static DisplaySupportUiState Evaluate(
             OptimizationStateSnapshot optimizationState,
             bool current48Hz,
-            bool current58Hz,
+            bool currentEcoHz,
             bool current60Hz,
             bool mutationControlsEnabled)
         {
@@ -45,22 +45,22 @@ namespace MacBookEco.App
             DisplayProfile installedProfile = optimizationState == null
                 ? null
                 : ProfileCatalog.GetById(optimizationState.DisplayProfileId);
-            DisplayRefreshMode mode58 = installedProfile == null
+            DisplayRefreshMode ecoMode = installedProfile == null
                 ? null
-                : installedProfile.GetTargetMode(58);
-            bool legacy = installed && mode58 == null;
+                : installedProfile.GetTargetMode(59);
+            bool legacy = installed && ecoMode == null;
             bool ready48 = installed &&
                 optimizationState.Display48HzAvailable;
-            bool ready58 = installed && !legacy &&
-                optimizationState.Display58HzAvailable;
+            bool readyEco = installed && !legacy &&
+                optimizationState.DisplayEcoHzAvailable;
             bool ready60 = stateAvailable &&
                 optimizationState.Display60HzAvailable;
 
             DisplaySupportUiState result = new DisplaySupportUiState();
             result.CanSelect48Hz = mutationControlsEnabled && ready48;
-            result.CanSelect58Hz = mutationControlsEnabled && ready58;
+            result.CanSelectEcoHz = mutationControlsEnabled && readyEco;
             result.Show48Hz = ready48 || current48Hz;
-            result.Show58Hz = ready58 || current58Hz;
+            result.ShowEcoHz = readyEco || currentEcoHz;
             result.Show60Hz = ready60 || current60Hz;
             // Native 60 Hz never depends on EDID ownership, but it must still
             // be enumerated by Windows for the current display configuration.
@@ -70,7 +70,7 @@ namespace MacBookEco.App
             result.CanRemove = mutationControlsEnabled && installed;
             result.InstallText = installed || conflict
                 ? "Refresh Eco display support"
-                : "Install 48 + 58 Hz support";
+                : "Install 48 Hz + 60 Hz Eco support";
             // Re-running the install action for an owned profile is a safe
             // read-back repair: the elevated service reconciles the exact
             // owned bytes and never overwrites a foreign override.  A fresh
@@ -80,18 +80,18 @@ namespace MacBookEco.App
                 && stateAvailable
                 && (legacy
                     ? current60Hz
-                    : (installed && ready48 && ready58) ||
+                    : (installed && ready48 && readyEco) ||
                         ((conflict || recoverable) && current60Hz));
             result.SupportText = SupportText(
                 stateAvailable,
                 installed,
                 legacy,
                 ready48,
-                ready58,
+                readyEco,
                 notInstalled,
                 restored,
                 current48Hz,
-                current58Hz,
+                currentEcoHz,
                 current60Hz,
                 state);
             return result;
@@ -102,11 +102,11 @@ namespace MacBookEco.App
             bool installed,
             bool legacy,
             bool ready48,
-            bool ready58,
+            bool readyEco,
             bool notInstalled,
             bool restored,
             bool current48Hz,
-            bool current58Hz,
+            bool currentEcoHz,
             bool current60Hz,
             string state)
         {
@@ -125,22 +125,22 @@ namespace MacBookEco.App
                         : "Return to 60 Hz before refreshing Eco display support.";
                 }
 
-                return ready48 && ready58
-                    ? "48 + 58 Hz support is installed by MacBook Eco."
+                return ready48 && readyEco
+                    ? "48 Hz + 60 Hz Eco support is installed by MacBook Eco."
                     : "Eco display support is installed, but Windows has not "
                         + "exposed both modes yet. Restart Windows to activate it.";
             }
 
             if (restored)
             {
-                return current48Hz || current58Hz
+                return current48Hz || currentEcoHz
                     ? "Eco display support was removed. Restart Windows to finish removal."
                     : "Eco display support is not installed.";
             }
 
             if (notInstalled)
             {
-                return current48Hz || current58Hz
+                return current48Hz || currentEcoHz
                     ? "An Eco refresh rate is active from external support. "
                         + "MacBook Eco will not modify it."
                     : "Eco display support is not installed.";

@@ -48,7 +48,7 @@ The helper records the expected owned bytes before writing them, then verifies
 the registry value byte-for-byte. Removal deletes only that exact owned value.
 A foreign or changed value is left untouched.
 
-For a 48/58/60 Hz switch, the application:
+For a 48 Hz/60 Hz Eco/native 60 Hz switch, the application:
 
 1. resolves the internal panel and saves its stable identity and complete mode;
 2. starts the watchdog and waits for readiness;

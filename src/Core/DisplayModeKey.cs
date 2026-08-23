@@ -176,12 +176,12 @@ namespace MacBookEco.Core
     {
         public static bool IsReviewedRefreshRate(int refreshRate)
         {
-            return refreshRate == 48 || refreshRate == 58 || refreshRate == 60;
+            return refreshRate == 48 || refreshRate == 59 || refreshRate == 60;
         }
 
         public static bool IsEcoRefreshRate(int refreshRate)
         {
-            return refreshRate == 48 || refreshRate == 58;
+            return refreshRate == 48 || refreshRate == 59;
         }
 
         public static bool IsWatchdogRecoveryRefreshRate(int refreshRate)

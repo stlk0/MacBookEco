@@ -256,8 +256,8 @@ namespace MacBookEco.App
             layout.Controls.Add(modes, 0, 2);
 
             layout.Controls.Add(CreateWrappingCaption(
-                "48 Hz is the Apple-supported compatibility mode. 58 Hz uses "
-                + "the native pixel clock with a longer V-blank to allow lower "
+                "48 Hz is the Apple-supported compatibility mode. 60 Hz Eco "
+                + "uses the reviewed 60000/1001 timing class to allow lower "
                 + "idle GPU memory clocks."),
                 0,
                 3);
@@ -289,7 +289,7 @@ namespace MacBookEco.App
             supportActions.Anchor = AnchorStyles.Right;
             supportActions.AutoSize = true;
             InstallDisplayButton = DashboardTheme.CreateSecondaryButton(
-                "Install 48 + 58 Hz support",
+                "Install 48 Hz + 60 Hz Eco support",
                 delegate { _installDisplaySupport(); });
             InstallDisplayButton.Enabled = false;
             supportActions.Controls.Add(InstallDisplayButton);
