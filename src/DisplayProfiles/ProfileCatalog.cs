@@ -35,6 +35,8 @@ namespace MacBookEco.Core
         private const string LegacyMacBookPro161Appa0444b2eEcoModesProfileId =
             "macbookpro16-1-appa044-4b2ea063-48-58hz-v2";
 
+        private const int LegacyExperimentalRefreshRate = 61;
+
         private static readonly DetailedTiming NativeAppa044Timing =
             DetailedTiming.ParseHex(
                 "E7 91 00 50 C0 80 37 70 08 20 98 08 59 D7 10 00 00 1A");
@@ -51,8 +53,68 @@ namespace MacBookEco.Core
             DetailedTiming.ParseHex(
                 "E7 91 00 50 C0 80 80 70 08 20 98 08 59 D7 10 00 00 1A");
 
+        private static readonly DisplayModeDefinition CompatibilityModeValue =
+            new DisplayModeDefinition(
+                48,
+                "48 Hz",
+                true,
+                false);
+
+        // EnumDisplaySettingsEx exposes 60000/1001 in the integer 59 bucket.
+        // CCD supplies the exact rational used for signal read-back.
+        private static readonly DisplayModeDefinition EcoModeValue =
+            new DisplayModeDefinition(
+                59,
+                "60 Hz Eco",
+                true,
+                false);
+
+        private static readonly DisplayModeDefinition NativeModeValue =
+            new DisplayModeDefinition(
+                60,
+                "60 Hz Native",
+                false,
+                true);
+
+        private static readonly DisplayModeDefinition LegacyEcoModeValue =
+            new DisplayModeDefinition(
+                58,
+                "58 Hz Legacy",
+                true,
+                false);
+
+        private static readonly ProfileModeTemplate CompatibilityModeTemplate =
+            new ProfileModeTemplate(
+                CompatibilityModeValue,
+                Appa04448HzTiming);
+
+        private static readonly ProfileModeTemplate EcoModeTemplate =
+            new ProfileModeTemplate(
+                EcoModeValue,
+                Appa044Eco60HzTiming,
+                60000U,
+                1001U);
+
+        private static readonly ProfileModeTemplate LegacyEcoModeTemplate =
+            new ProfileModeTemplate(
+                LegacyEcoModeValue,
+                LegacyAppa04458HzTiming);
+
+        private static readonly ReadOnlyCollection<DisplayModeDefinition>
+            ReviewedModes = Array.AsReadOnly(
+                new[]
+                {
+                    CompatibilityModeValue,
+                    EcoModeValue,
+                    NativeModeValue
+                });
+
         private static readonly ReadOnlyCollection<DisplayProfile> Profiles =
-            CreateAppa044Profiles(true, false);
+            CreateAppa044Profiles(
+                MacBookPro161Appa044EcoModesProfileId,
+                MacBookPro161Appa044Faf4EcoModesProfileId,
+                MacBookPro161Appa0444b2eEcoModesProfileId,
+                new[] { CompatibilityModeTemplate, EcoModeTemplate });
 
         // Historical app-owned profiles remain compiled only so existing
         // journals can still be verified and safely restored after an update.
@@ -62,60 +124,129 @@ namespace MacBookEco.Core
 
         public static ReadOnlyCollection<DisplayProfile> All => Profiles;
 
+        public static ReadOnlyCollection<DisplayModeDefinition> Modes =>
+            ReviewedModes;
+
+        public static DisplayModeDefinition CompatibilityMode =>
+            CompatibilityModeValue;
+
+        public static DisplayModeDefinition EcoMode => EcoModeValue;
+
+        public static DisplayModeDefinition NativeMode => NativeModeValue;
+
+        public static string OwnedSupportDisplayName
+        {
+            get
+            {
+                var names = new List<string>();
+                for (var index = 0; index < ReviewedModes.Count; index++)
+                {
+                    if (ReviewedModes[index].RequiresOwnedSupport)
+                    {
+                        names.Add(ReviewedModes[index].DisplayName);
+                    }
+                }
+
+                return string.Join(" + ", names.ToArray());
+            }
+        }
+
+        public static string ReviewedModeDisplayName
+        {
+            get
+            {
+                var names = new List<string>();
+                for (var index = 0; index < ReviewedModes.Count; index++)
+                {
+                    names.Add(ReviewedModes[index].DisplayName);
+                }
+
+                return string.Join(", ", names.ToArray());
+            }
+        }
+
+        public static DisplayModeDefinition GetMode(int refreshRate)
+        {
+            for (var index = 0; index < ReviewedModes.Count; index++)
+            {
+                if (ReviewedModes[index].WindowsRefreshRate == refreshRate)
+                {
+                    return ReviewedModes[index];
+                }
+            }
+
+            return null;
+        }
+
+        public static DisplayModeDefinition GetModeForWindowsSelector(
+            double? refreshRate)
+        {
+            for (var index = 0; index < ReviewedModes.Count; index++)
+            {
+                if (ReviewedModes[index].MatchesWindowsSelector(refreshRate))
+                {
+                    return ReviewedModes[index];
+                }
+            }
+
+            return null;
+        }
+
+        public static bool IsHistoricalRecoveryMode(int refreshRate)
+        {
+            return refreshRate == LegacyEcoModeValue.WindowsRefreshRate ||
+                refreshRate == LegacyExperimentalRefreshRate;
+        }
+
         private static ReadOnlyCollection<DisplayProfile> CreateAppa044Profiles(
-            bool includeEcoMode,
-            bool useLegacy58Hz)
+            string primaryProfileId,
+            string alternateProfileId,
+            string radeon5500ProfileId,
+            ProfileModeTemplate[] modes)
         {
             return Array.AsReadOnly(
                 new[]
                 {
                     CreateAppa044Profile(
-                        includeEcoMode
-                            ? useLegacy58Hz
-                                ? LegacyMacBookPro161Appa044EcoModesProfileId
-                                : MacBookPro161Appa044EcoModesProfileId
-                            : MacBookPro161Appa044ProfileId,
+                        primaryProfileId,
                         "MacBook Pro 16-inch 2019 / APPA044",
                         "CDA0E18080DE8CAC744C66A5374A53CBBA1999115FA5FE2DBD949980649AF3F5",
                         "AMD Radeon Pro 5300M",
                         "30.0.13045.22003",
                         false,
-                        includeEcoMode,
-                        useLegacy58Hz),
+                        modes),
                     CreateAppa044Profile(
-                        includeEcoMode
-                            ? useLegacy58Hz
-                                ? LegacyMacBookPro161Appa044Faf4EcoModesProfileId
-                                : MacBookPro161Appa044Faf4EcoModesProfileId
-                            : MacBookPro161Appa044Faf4ProfileId,
+                        alternateProfileId,
                         "MacBook Pro 16-inch 2019 / APPA044 FAF4A9C1",
                         "FAF4A9C16A6B394896D75DAA3280D84A61744EA07ED2F7CC21E6CFBCF1B4D2DF",
                         "AMD Radeon Pro 5300M",
                         string.Empty,
-                        includeEcoMode,
-                        includeEcoMode,
-                        useLegacy58Hz),
+                        true,
+                        modes),
                     CreateAppa044Profile(
-                        includeEcoMode
-                            ? useLegacy58Hz
-                                ? LegacyMacBookPro161Appa0444b2eEcoModesProfileId
-                                : MacBookPro161Appa0444b2eEcoModesProfileId
-                            : MacBookPro161Appa0444b2eProfileId,
+                        radeon5500ProfileId,
                         "MacBook Pro 16-inch 2019 / APPA044 4B2EA063",
                         "4B2EA0633F9C80C074E8F06E891B5F179444E0A417CD60AFBD190C732840B7EC",
                         "AMD Radeon Pro 5500M",
                         "26.20.13003.5002",
-                        includeEcoMode,
-                        includeEcoMode,
-                        useLegacy58Hz)
+                        true,
+                        modes)
                 });
         }
 
         private static ReadOnlyCollection<DisplayProfile> CreateLegacyProfiles()
         {
             var profiles = new List<DisplayProfile>();
-            profiles.AddRange(CreateAppa044Profiles(true, true));
-            profiles.AddRange(CreateAppa044Profiles(false, false));
+            profiles.AddRange(CreateAppa044Profiles(
+                LegacyMacBookPro161Appa044EcoModesProfileId,
+                LegacyMacBookPro161Appa044Faf4EcoModesProfileId,
+                LegacyMacBookPro161Appa0444b2eEcoModesProfileId,
+                new[] { CompatibilityModeTemplate, LegacyEcoModeTemplate }));
+            profiles.AddRange(CreateAppa044Profiles(
+                MacBookPro161Appa044ProfileId,
+                MacBookPro161Appa044Faf4ProfileId,
+                MacBookPro161Appa0444b2eProfileId,
+                new[] { CompatibilityModeTemplate }));
             return profiles.AsReadOnly();
         }
 
@@ -125,25 +256,19 @@ namespace MacBookEco.Core
             string normalizedEdidSignature,
             string verifiedGpuName,
             string verifiedDriverVersion,
-            bool experimentalEcoMode,
-            bool includeEcoMode,
-            bool useLegacy58Hz)
+            bool experimentalAdditionalModes,
+            ProfileModeTemplate[] templates)
         {
-            var modes = new List<DisplayRefreshMode>
+            var modes = new List<DisplayRefreshMode>();
+            for (var index = 0; index < templates.Length; index++)
             {
-                new DisplayRefreshMode(
-                    48,
-                    Appa04448HzTiming,
-                    false)
-            };
-            if (includeEcoMode)
-            {
+                ProfileModeTemplate template = templates[index];
                 modes.Add(new DisplayRefreshMode(
-                    useLegacy58Hz ? 58 : 59,
-                    useLegacy58Hz
-                        ? LegacyAppa04458HzTiming
-                        : Appa044Eco60HzTiming,
-                    experimentalEcoMode));
+                    template.Definition,
+                    template.Timing,
+                    experimentalAdditionalModes && index > 0,
+                    template.ExpectedRefreshRateNumerator,
+                    template.ExpectedRefreshRateDenominator));
             }
 
             return new DisplayProfile(
@@ -157,6 +282,28 @@ namespace MacBookEco.Core
                 verifiedGpuName,
                 "PCI\\VEN_1002&DEV_7340",
                 verifiedDriverVersion);
+        }
+
+        private sealed class ProfileModeTemplate
+        {
+            internal ProfileModeTemplate(
+                DisplayModeDefinition definition,
+                DetailedTiming timing,
+                uint expectedRefreshRateNumerator = 0U,
+                uint expectedRefreshRateDenominator = 0U)
+            {
+                Definition = definition ?? throw new ArgumentNullException(
+                    nameof(definition));
+                Timing = timing ?? throw new ArgumentNullException(
+                    nameof(timing));
+                ExpectedRefreshRateNumerator = expectedRefreshRateNumerator;
+                ExpectedRefreshRateDenominator = expectedRefreshRateDenominator;
+            }
+
+            internal DisplayModeDefinition Definition { get; private set; }
+            internal DetailedTiming Timing { get; private set; }
+            internal uint ExpectedRefreshRateNumerator { get; private set; }
+            internal uint ExpectedRefreshRateDenominator { get; private set; }
         }
 
         public static DisplayProfile GetById(string profileId)
@@ -173,6 +320,26 @@ namespace MacBookEco.Core
             }
 
             return FindById(LegacyProfiles, profileId);
+        }
+
+        public static bool HasAllOwnedModes(DisplayProfile profile)
+        {
+            if (profile == null)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < ReviewedModes.Count; index++)
+            {
+                DisplayModeDefinition mode = ReviewedModes[index];
+                if (mode.RequiresOwnedSupport &&
+                    profile.GetTargetMode(mode.WindowsRefreshRate) == null)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         internal static bool ShouldRefreshInstalledProfile(
@@ -349,16 +516,27 @@ namespace MacBookEco.Core
             text.AppendLine(
                 "Hardware supported: "
                 + (selection.HardwareSupported ? "True" : "False"));
-            DisplayRefreshMode ecoMode = selection.Profile == null
-                ? null
-                : selection.Profile.GetTargetMode(59);
-            text.AppendLine(
-                "60 Hz Eco validation: "
-                + (ecoMode == null
-                    ? "Unavailable"
-                    : ecoMode.Experimental
-                        ? "Experimental"
-                        : "Hardware-verified"));
+            for (var index = 0; index < ReviewedModes.Count; index++)
+            {
+                DisplayModeDefinition definition = ReviewedModes[index];
+                if (!definition.RequiresOwnedSupport)
+                {
+                    continue;
+                }
+
+                DisplayRefreshMode mode = selection.Profile == null
+                    ? null
+                    : selection.Profile.GetTargetMode(
+                        definition.WindowsRefreshRate);
+                text.AppendLine(
+                    definition.DisplayName
+                        + " validation: "
+                        + (mode == null
+                            ? "Unavailable"
+                            : mode.Experimental
+                                ? "Experimental"
+                                : "Hardware-verified"));
+            }
 
             AppendFindings(text, "Mismatch", closest == null
                 ? null

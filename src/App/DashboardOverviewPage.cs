@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
+using MacBookEco.Core;
 using MacBookEco.Telemetry;
 
 namespace MacBookEco.App
@@ -249,10 +250,15 @@ namespace MacBookEco.App
                     + display.Height.ToString(CultureInfo.InvariantCulture)
                 : "Resolution N/A";
             _displayCard.Status = ToCardStatus(display.Availability);
-            _displayCard.StatusText = display.IsRefreshRate(48.0) ||
-                    display.IsRefreshRate(59.0)
-                ? "Eco"
-                : (display.IsRefreshRate(60.0) ? "Native" : string.Empty);
+            DisplayModeDefinition currentMode =
+                ProfileCatalog.GetModeForWindowsSelector(
+                    display.RefreshRateHz);
+
+            _displayCard.StatusText = currentMode == null
+                ? string.Empty
+                : currentMode.RequiresOwnedSupport
+                    ? "Eco"
+                    : currentMode.NativeRecovery ? "Native" : string.Empty;
         }
 
         private void UpdateGpuCard(GpuTelemetry gpu)

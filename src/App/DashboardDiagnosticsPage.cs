@@ -126,15 +126,15 @@ namespace MacBookEco.App
                 text.AppendLine(
                     "Display profile: "
                     + PublicProfileId(optimizationState.DisplayProfileId));
-                text.AppendLine(
-                    "48 Hz mode exposed by Windows: "
-                    + optimizationState.Display48HzAvailable);
-                text.AppendLine(
-                    "60 Hz Eco mode exposed by Windows: "
-                    + optimizationState.DisplayEcoHzAvailable);
-                text.AppendLine(
-                    "60 Hz mode exposed by Windows: "
-                    + optimizationState.Display60HzAvailable);
+                for (var index = 0; index < ProfileCatalog.Modes.Count; index++)
+                {
+                    DisplayModeDefinition mode = ProfileCatalog.Modes[index];
+                    text.AppendLine(
+                        mode.DisplayName
+                            + " mode exposed by Windows: "
+                            + optimizationState.IsDisplayModeAvailable(
+                                mode.WindowsRefreshRate));
+                }
             }
 
             text.AppendLine();

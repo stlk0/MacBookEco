@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using MacBookEco.AppPolicy;
+using MacBookEco.Core;
 using MacBookEco.Telemetry;
 
 namespace MacBookEco.App
@@ -18,9 +19,7 @@ namespace MacBookEco.App
         private readonly NotifyIcon _notifyIcon;
         private readonly ContextMenuStrip _menu;
         private readonly ToolStripMenuItem _statusItem;
-        private readonly ToolStripMenuItem _refresh48Item;
-        private readonly ToolStripMenuItem _refreshEcoItem;
-        private readonly ToolStripMenuItem _refresh60Item;
+        private readonly Dictionary<int, ToolStripMenuItem> _refreshItems;
         private readonly ToolStripSeparator _displayModesSeparator;
         private readonly ToolStripMenuItem _installDisplayItem;
         private readonly ToolStripMenuItem _removeDisplayItem;
@@ -103,26 +102,28 @@ namespace MacBookEco.App
 
             ToolStripMenuItem displayMenu =
                 new ToolStripMenuItem("Display refresh rate");
-            _refresh48Item = TrackMutation(new ToolStripMenuItem("48 Hz"));
-            _refresh48Item.Click += delegate {
-                RunCommand(OptimizationCommand.SetDisplayRefreshRate(48));
-            };
-            _refreshEcoItem = TrackMutation(new ToolStripMenuItem("60 Hz Eco"));
-            _refreshEcoItem.Click += delegate {
-                RunCommand(OptimizationCommand.SetDisplayRefreshRate(59));
-            };
-            _refresh60Item = TrackMutation(new ToolStripMenuItem("60 Hz Native"));
-            _refresh60Item.Click += delegate {
-                RunCommand(OptimizationCommand.SetDisplayRefreshRate(60));
-            };
-            displayMenu.DropDownItems.Add(_refresh48Item);
-            displayMenu.DropDownItems.Add(_refreshEcoItem);
-            displayMenu.DropDownItems.Add(_refresh60Item);
+            _refreshItems = new Dictionary<int, ToolStripMenuItem>();
+            for (var index = 0; index < ProfileCatalog.Modes.Count; index++)
+            {
+                DisplayModeDefinition mode = ProfileCatalog.Modes[index];
+                int refreshRate = mode.WindowsRefreshRate;
+                ToolStripMenuItem item = TrackMutation(
+                    new ToolStripMenuItem(mode.DisplayName));
+                item.Click += delegate {
+                    RunCommand(OptimizationCommand.SetDisplayRefreshRate(
+                        refreshRate));
+                };
+                _refreshItems.Add(refreshRate, item);
+                displayMenu.DropDownItems.Add(item);
+            }
             _displayModesSeparator = new ToolStripSeparator();
             displayMenu.DropDownItems.Add(_displayModesSeparator);
 
             _installDisplayItem = TrackMutation(
-                new ToolStripMenuItem("Install 48 Hz + 60 Hz Eco support..."));
+                new ToolStripMenuItem(
+                    "Install "
+                        + ProfileCatalog.OwnedSupportDisplayName
+                        + " support..."));
             _installDisplayItem.Click += delegate {
                 RunCommand(OptimizationCommand.InstallDisplaySupport());
             };
@@ -259,7 +260,7 @@ namespace MacBookEco.App
             OptimizationStateSnapshot state = _stateMonitor.Current;
             if (snapshot == null)
             {
-                ApplyDisplayMenuPolicy(state, false, false, false);
+                ApplyDisplayMenuPolicy(state, null);
                 return;
             }
 
@@ -280,14 +281,9 @@ namespace MacBookEco.App
 
             _statusItem.Text = charge + " \u00b7 " + power + " \u00b7 "
                 + refresh + " \u00b7 " + cpuProfile;
-            _refresh48Item.Checked = snapshot.Display.IsRefreshRate(48.0);
-            _refreshEcoItem.Checked = snapshot.Display.IsRefreshRate(59.0);
-            _refresh60Item.Checked = snapshot.Display.IsRefreshRate(60.0);
             ApplyDisplayMenuPolicy(
                 state,
-                snapshot.Display.IsRefreshRate(48.0),
-                snapshot.Display.IsRefreshRate(59.0),
-                snapshot.Display.IsRefreshRate(60.0));
+                CurrentRefreshRate(snapshot.Display));
             _cpuEverydayItem.Checked = IsCpuPreset(state, PowerPreset.Normal);
             _cpuCoolItem.Checked = IsCpuPreset(state, PowerPreset.Cool);
             _cpuBatteryItem.Checked =
@@ -302,24 +298,24 @@ namespace MacBookEco.App
 
         private void ApplyDisplayMenuPolicy(
             OptimizationStateSnapshot state,
-            bool current48Hz,
-            bool currentEcoHz,
-            bool current60Hz)
+            int? currentRefreshRate)
         {
             DisplaySupportUiState display = DisplaySupportUiPolicy.Evaluate(
                 state,
-                current48Hz,
-                currentEcoHz,
-                current60Hz,
+                currentRefreshRate,
                 _mutationControlsEnabled);
-            _refresh48Item.Visible = display.Show48Hz;
-            _refreshEcoItem.Visible = display.ShowEcoHz;
-            _refresh60Item.Visible = display.Show60Hz;
-            _displayModesSeparator.Visible = display.Show48Hz ||
-                display.ShowEcoHz || display.Show60Hz;
-            SetMenuItemEnabled(_refresh48Item, display.CanSelect48Hz);
-            SetMenuItemEnabled(_refreshEcoItem, display.CanSelectEcoHz);
-            SetMenuItemEnabled(_refresh60Item, display.CanSelect60Hz);
+            bool anyVisible = false;
+            for (var index = 0; index < display.Modes.Count; index++)
+            {
+                DisplayModeUiState mode = display.Modes[index];
+                ToolStripMenuItem item = _refreshItems[mode.Mode.WindowsRefreshRate];
+                item.Checked = mode.Current;
+                item.Visible = mode.Show;
+                SetMenuItemEnabled(item, mode.CanSelect);
+                anyVisible |= mode.Show;
+            }
+
+            _displayModesSeparator.Visible = anyVisible;
             string installText = display.InstallText + "...";
             if (!string.Equals(
                 _installDisplayItem.Text,
@@ -336,6 +332,24 @@ namespace MacBookEco.App
             }
 
             SetMenuItemEnabled(_removeDisplayItem, display.CanRemove);
+        }
+
+        private static int? CurrentRefreshRate(DisplayTelemetry display)
+        {
+            if (display == null || !display.RefreshRateHz.HasValue)
+            {
+                return null;
+            }
+
+            DisplayModeDefinition mode =
+                ProfileCatalog.GetModeForWindowsSelector(
+                    display.RefreshRateHz);
+            if (mode != null)
+            {
+                return mode.WindowsRefreshRate;
+            }
+
+            return (int)Math.Round(display.RefreshRateHz.Value);
         }
 
         private static void SetMenuItemEnabled(

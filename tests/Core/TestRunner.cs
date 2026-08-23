@@ -67,6 +67,9 @@ namespace MacBookEco.Tests.Core
                     "Exact 48 Hz and 60 Hz Eco DTDs use both free slots",
                     InsertExactEcoModes),
                 Test(
+                    "Display mode registry drives every current profile",
+                    DisplayModeRegistryDrivesProfiles),
+                Test(
                     "Normalized signature is stable after managed insertion",
                     NormalizedSignature),
                 Test(
@@ -473,6 +476,59 @@ namespace MacBookEco.Tests.Core
             var warningMatch = selected.Profile.Match(otherDriver);
             Check.True(warningMatch.HardwareSupported);
             Check.Equal(1, warningMatch.Warnings.Count);
+        }
+
+        private static void DisplayModeRegistryDrivesProfiles()
+        {
+            Check.Equal(3, ProfileCatalog.Modes.Count);
+            Check.Equal(
+                59,
+                ProfileCatalog.EcoMode.WindowsRefreshRate);
+            DisplayRefreshMode ecoProfileMode =
+                ProfileCatalog.All[0].GetTargetMode(
+                    ProfileCatalog.EcoMode.WindowsRefreshRate);
+            Check.Equal(
+                60000U,
+                ecoProfileMode.ExpectedRefreshRateNumerator);
+            Check.Equal(
+                1001U,
+                ecoProfileMode.ExpectedRefreshRateDenominator);
+            Check.Equal(
+                ProfileCatalog.EcoMode,
+                ProfileCatalog.GetModeForWindowsSelector(59.0));
+            Check.True(
+                ProfileCatalog.GetModeForWindowsSelector(59.94) == null);
+
+            for (var modeIndex = 0;
+                modeIndex < ProfileCatalog.Modes.Count;
+                modeIndex++)
+            {
+                DisplayModeDefinition definition =
+                    ProfileCatalog.Modes[modeIndex];
+                Check.True(
+                    DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(
+                        definition.WindowsRefreshRate));
+
+                for (var profileIndex = 0;
+                    profileIndex < ProfileCatalog.All.Count;
+                    profileIndex++)
+                {
+                    DisplayRefreshMode profileMode =
+                        ProfileCatalog.All[profileIndex].GetTargetMode(
+                            definition.WindowsRefreshRate);
+                    if (definition.RequiresOwnedSupport)
+                    {
+                        Check.NotNull(profileMode);
+                        Check.True(ReferenceEquals(
+                            definition,
+                            profileMode.Definition));
+                    }
+                    else
+                    {
+                        Check.True(profileMode == null);
+                    }
+                }
+            }
         }
 
         private static void AlternateAppa044ProfileMatches()
@@ -963,11 +1019,10 @@ namespace MacBookEco.Tests.Core
             Check.True(DisplayModeSelectionPolicy.IsReviewedRefreshRate(59));
             Check.True(DisplayModeSelectionPolicy.IsReviewedRefreshRate(60));
             Check.False(DisplayModeSelectionPolicy.IsReviewedRefreshRate(58));
-            Check.True(DisplayModeSelectionPolicy.IsEcoRefreshRate(48));
-            Check.True(DisplayModeSelectionPolicy.IsEcoRefreshRate(59));
-            Check.False(DisplayModeSelectionPolicy.IsEcoRefreshRate(60));
             Check.True(
                 DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(59));
+            Check.True(
+                DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(58));
             Check.True(
                 DisplayModeSelectionPolicy.IsWatchdogRecoveryRefreshRate(61));
 

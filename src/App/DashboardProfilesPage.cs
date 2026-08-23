@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using MacBookEco.AppPolicy;
+using MacBookEco.Core;
 
 namespace MacBookEco.App
 {
@@ -177,10 +178,14 @@ namespace MacBookEco.App
                     eventArgs.ListItem as OptimizationProfileDefinition;
                 if (profile != null)
                 {
+                    DisplayModeDefinition mode = ProfileCatalog.GetMode(
+                        profile.DisplayRefreshRate);
                     eventArgs.Value = profile.DisplayName
                         + "  \u2014  "
-                        + profile.DisplayRefreshRate
-                        + " Hz + "
+                        + (mode == null
+                            ? profile.DisplayRefreshRate + " Hz"
+                            : mode.DisplayName)
+                        + " + "
                         + PowerPresetCatalog.Get(profile.CpuPreset).DisplayName;
                 }
             };
@@ -289,7 +294,9 @@ namespace MacBookEco.App
             supportActions.Anchor = AnchorStyles.Right;
             supportActions.AutoSize = true;
             InstallDisplayButton = DashboardTheme.CreateSecondaryButton(
-                "Install 48 Hz + 60 Hz Eco support",
+                "Install "
+                    + ProfileCatalog.OwnedSupportDisplayName
+                    + " support",
                 delegate { _installDisplaySupport(); });
             InstallDisplayButton.Enabled = false;
             supportActions.Controls.Add(InstallDisplayButton);

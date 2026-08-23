@@ -174,20 +174,27 @@ namespace MacBookEco.Core
     /// </summary>
     public static class DisplayModeSelectionPolicy
     {
+        private const int CompatibilityRefreshRate = 48;
+        private const int LegacyEcoRefreshRate = 58;
+        private const int EcoRefreshRate = 59;
+        private const int NativeRefreshRate = 60;
+        private const int LegacyExperimentalRefreshRate = 61;
+
         public static bool IsReviewedRefreshRate(int refreshRate)
         {
-            return refreshRate == 48 || refreshRate == 59 || refreshRate == 60;
-        }
-
-        public static bool IsEcoRefreshRate(int refreshRate)
-        {
-            return refreshRate == 48 || refreshRate == 59;
+            // This file is compiled into the independent watchdog without the
+            // profile catalog. Keep its bounded recovery protocol explicit;
+            // profile tests verify that every catalog mode remains covered.
+            return refreshRate == CompatibilityRefreshRate ||
+                refreshRate == EcoRefreshRate ||
+                refreshRate == NativeRefreshRate;
         }
 
         public static bool IsWatchdogRecoveryRefreshRate(int refreshRate)
         {
             return IsReviewedRefreshRate(refreshRate) ||
-                refreshRate == 59 || refreshRate == 61;
+                refreshRate == LegacyEcoRefreshRate ||
+                refreshRate == LegacyExperimentalRefreshRate;
         }
 
         public static bool IsExactRefreshOnlyCandidate(

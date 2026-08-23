@@ -1,4 +1,5 @@
 using System;
+using MacBookEco.Core;
 
 namespace MacBookEco.App
 {
@@ -116,7 +117,9 @@ namespace MacBookEco.App
             if (UninstallSafetyPolicy.IsRecoverableStateName(displayState))
             {
                 OptimizationActionResult nativeMode =
-                    _actions.SetDisplayRefreshRate(60, displayConfirmation);
+                    _actions.SetDisplayRefreshRate(
+                        ProfileCatalog.NativeMode.WindowsRefreshRate,
+                        displayConfirmation);
                 if (!Succeeded(nativeMode))
                 {
                     return Stopped("the switch to native 60 Hz", nativeMode);

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using MacBookEco.AppPolicy;
+using MacBookEco.Core;
 
 namespace MacBookEco.App
 {
@@ -31,17 +32,17 @@ namespace MacBookEco.App
                 new OptimizationProfileDefinition(
                     "Everyday",
                     "60 Hz display with a responsive but battery-aware CPU plan.",
-                    60,
+                    ProfileCatalog.NativeMode.WindowsRefreshRate,
                     PowerPreset.Normal),
                 new OptimizationProfileDefinition(
                     "Cool & quiet",
                     "48 Hz and no CPU turbo for lower heat without a severe CPU cap.",
-                    48,
+                    ProfileCatalog.CompatibilityMode.WindowsRefreshRate,
                     PowerPreset.Cool),
                 new OptimizationProfileDefinition(
                     "Battery saver",
                     "48 Hz with the strongest CPU and passive-cooling limits.",
-                    48,
+                    ProfileCatalog.CompatibilityMode.WindowsRefreshRate,
                     PowerPreset.MaximumBattery)
             }.AsReadOnly();
 

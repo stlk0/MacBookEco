@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using MacBookEco.AppPolicy;
+using MacBookEco.Core;
 using MacBookEco.Platform.Windows;
 
 namespace MacBookEco.App
@@ -274,6 +276,17 @@ namespace MacBookEco.App
                 bool active = installed
                     && power.OwnedScheme != Guid.Empty
                     && power.ActiveScheme == power.OwnedScheme;
+                var availableDisplayModes = new List<int>();
+                for (var index = 0; index < ProfileCatalog.Modes.Count; index++)
+                {
+                    DisplayModeDefinition mode = ProfileCatalog.Modes[index];
+                    if ((!mode.RequiresOwnedSupport ||
+                            display.State == ManagedResourceState.Installed) &&
+                        ReadModeAvailability(mode.WindowsRefreshRate))
+                    {
+                        availableDisplayModes.Add(mode.WindowsRefreshRate);
+                    }
+                }
 
                 return new OptimizationStateSnapshot(
                     true,
@@ -285,11 +298,7 @@ namespace MacBookEco.App
                     active
                         ? "The active Windows power plan is owned by MacBook Eco."
                         : "The original or another Windows power plan is active.",
-                    display.State == ManagedResourceState.Installed
-                        && ReadModeAvailability(48),
-                    display.State == ManagedResourceState.Installed
-                        && ReadModeAvailability(59),
-                    ReadModeAvailability(60));
+                    availableDisplayModes);
             }
             catch (Exception exception)
             {
