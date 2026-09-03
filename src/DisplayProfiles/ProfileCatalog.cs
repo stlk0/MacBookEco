@@ -113,7 +113,12 @@ namespace MacBookEco.Core
                 });
 
         private static readonly ReadOnlyCollection<DisplayProfile> Profiles =
-            CreateCurrentProfiles();
+            CreateAppa044Profiles(
+                MacBookPro161Appa044EcoModesProfileId,
+                MacBookPro161Appa044Faf4EcoModesProfileId,
+                MacBookPro161Appa0444b2eEcoModesProfileId,
+                MacBookPro161Appa044235fEcoModesProfileId,
+                new[] { CompatibilityModeTemplate, EcoModeTemplate });
 
         // Historical app-owned profiles remain compiled only so existing
         // journals can still be verified and safely restored after an update.
@@ -197,34 +202,14 @@ namespace MacBookEco.Core
                 refreshRate == LegacyExperimentalRefreshRate;
         }
 
-        private static ReadOnlyCollection<DisplayProfile> CreateCurrentProfiles()
-        {
-            var profiles = new List<DisplayProfile>();
-            ProfileModeTemplate[] modes =
-                { CompatibilityModeTemplate, EcoModeTemplate };
-            profiles.AddRange(CreateAppa044Profiles(
-                MacBookPro161Appa044EcoModesProfileId,
-                MacBookPro161Appa044Faf4EcoModesProfileId,
-                MacBookPro161Appa0444b2eEcoModesProfileId,
-                modes));
-            profiles.Add(CreateAppa044Profile(
-                MacBookPro161Appa044235fEcoModesProfileId,
-                "MacBook Pro 16-inch 2019 / APPA044 235FB43D",
-                "235FB43D444EEB6055EED98766FBA83F751998DA3F53068F06A2949744AB1EFF",
-                "AMD Radeon Pro 5300M",
-                "30.0.13045.22003",
-                true,
-                modes));
-            return profiles.AsReadOnly();
-        }
-
         private static ReadOnlyCollection<DisplayProfile> CreateAppa044Profiles(
             string primaryProfileId,
             string alternateProfileId,
             string radeon5500ProfileId,
+            string reported5300ProfileId,
             ProfileModeTemplate[] modes)
         {
-            return Array.AsReadOnly(
+            var profiles = new List<DisplayProfile>(
                 new[]
                 {
                     CreateAppa044Profile(
@@ -252,6 +237,20 @@ namespace MacBookEco.Core
                         true,
                         modes)
                 });
+
+            if (!string.IsNullOrEmpty(reported5300ProfileId))
+            {
+                profiles.Add(CreateAppa044Profile(
+                    reported5300ProfileId,
+                    "MacBook Pro 16-inch 2019 / APPA044 235FB43D",
+                    "235FB43D444EEB6055EED98766FBA83F751998DA3F53068F06A2949744AB1EFF",
+                    "AMD Radeon Pro 5300M",
+                    "30.0.13045.22003",
+                    true,
+                    modes));
+            }
+
+            return profiles.AsReadOnly();
         }
 
         private static ReadOnlyCollection<DisplayProfile> CreateLegacyProfiles()
@@ -261,11 +260,13 @@ namespace MacBookEco.Core
                 LegacyMacBookPro161Appa044EcoModesProfileId,
                 LegacyMacBookPro161Appa044Faf4EcoModesProfileId,
                 LegacyMacBookPro161Appa0444b2eEcoModesProfileId,
+                null,
                 new[] { CompatibilityModeTemplate, LegacyEcoModeTemplate }));
             profiles.AddRange(CreateAppa044Profiles(
                 MacBookPro161Appa044ProfileId,
                 MacBookPro161Appa044Faf4ProfileId,
                 MacBookPro161Appa0444b2eProfileId,
+                null,
                 new[] { CompatibilityModeTemplate }));
             return profiles.AsReadOnly();
         }
