@@ -33,6 +33,19 @@ namespace MacBookEco.Tests.Core
             "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 10 " +
             "00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 CC";
 
+        // Public APPA044 fixture for the Radeon Pro 5300M report in issue #15.
+        // Per-unit serial and manufacture bytes are cleared and the checksum
+        // is recomputed. The DisplayID extension is deliberately not retained.
+        private const string ReviewedAppa044235fEdid =
+            "00 FF FF FF FF FF FF 00 06 10 44 A0 00 00 00 00 " +
+            "00 00 01 04 B5 22 16 78 02 0F 51 AE 52 43 B0 26 " +
+            "0E 50 54 00 00 00 01 01 01 01 01 01 01 01 01 01 " +
+            "01 01 01 01 01 01 E7 91 00 50 C0 80 37 70 08 20 " +
+            "98 08 59 D7 10 00 00 1A 00 00 00 00 00 00 00 00 " +
+            "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 " +
+            "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 " +
+            "00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 93";
+
         // Public APPA044 fixture for the Radeon Pro 5500M report in issue #8.
         // Per-unit serial and manufacture bytes are cleared and the checksum
         // is recomputed. The DisplayID extension is deliberately not retained.
@@ -88,6 +101,9 @@ namespace MacBookEco.Tests.Core
                 Test(
                     "Alternate APPA044 EDID selects its exact profile",
                     AlternateAppa044ProfileMatches),
+                Test(
+                    "Reported APPA044 EDID selects its exact profile",
+                    ReportedAppa044ProfileMatches),
                 Test(
                     "Radeon Pro 5500M APPA044 EDID selects its exact profile",
                     Radeon5500Appa044ProfileMatches),
@@ -552,6 +568,33 @@ namespace MacBookEco.Tests.Core
                 selected.Profile.BuildOverride(hardware)
                     .ContainsDetailedTiming(
                         selected.Profile.GetTargetMode(59).Timing));
+            Check.True(selected.Profile.GetTargetMode(59).Experimental);
+        }
+
+        private static void ReportedAppa044ProfileMatches()
+        {
+            EdidBaseBlock edid =
+                EdidBaseBlock.ParseHex(ReviewedAppa044235fEdid);
+            HardwareSnapshot hardware = CreateKnownHardware(edid);
+            ProfileSelectionResult selected = ProfileCatalog.Select(hardware);
+
+            Check.True(selected.HardwareSupported);
+            Check.NotNull(selected.Profile);
+            Check.Equal(
+                ProfileCatalog.MacBookPro161Appa044235fEcoModesProfileId,
+                selected.Profile.Id);
+            Check.Equal(
+                Sha256Digest.ParseCanonical(
+                    "235FB43D444EEB6055EED98766FBA83F"
+                    + "751998DA3F53068F06A2949744AB1EFF"),
+                edid.NormalizedSignature);
+            Check.Equal(0, selected.ClosestMatch.RejectionReasons.Count);
+            Check.Equal(0, selected.ClosestMatch.Warnings.Count);
+            EdidBaseBlock installed = selected.Profile.BuildOverride(hardware);
+            Check.True(installed.ContainsDetailedTiming(
+                selected.Profile.GetTargetMode(48).Timing));
+            Check.True(installed.ContainsDetailedTiming(
+                selected.Profile.GetTargetMode(59).Timing));
             Check.True(selected.Profile.GetTargetMode(59).Experimental);
         }
 

@@ -26,6 +26,9 @@ namespace MacBookEco.Core
         public const string MacBookPro161Appa0444b2eEcoModesProfileId =
             "macbookpro16-1-appa044-4b2ea063-48-60eco-v3";
 
+        public const string MacBookPro161Appa044235fEcoModesProfileId =
+            "macbookpro16-1-appa044-235fb43d-48-60eco-v3";
+
         private const string LegacyMacBookPro161Appa044EcoModesProfileId =
             "macbookpro16-1-appa044-48-58hz-v2";
 
@@ -110,11 +113,7 @@ namespace MacBookEco.Core
                 });
 
         private static readonly ReadOnlyCollection<DisplayProfile> Profiles =
-            CreateAppa044Profiles(
-                MacBookPro161Appa044EcoModesProfileId,
-                MacBookPro161Appa044Faf4EcoModesProfileId,
-                MacBookPro161Appa0444b2eEcoModesProfileId,
-                new[] { CompatibilityModeTemplate, EcoModeTemplate });
+            CreateCurrentProfiles();
 
         // Historical app-owned profiles remain compiled only so existing
         // journals can still be verified and safely restored after an update.
@@ -196,6 +195,27 @@ namespace MacBookEco.Core
         {
             return refreshRate == LegacyEcoModeValue.WindowsRefreshRate ||
                 refreshRate == LegacyExperimentalRefreshRate;
+        }
+
+        private static ReadOnlyCollection<DisplayProfile> CreateCurrentProfiles()
+        {
+            var profiles = new List<DisplayProfile>();
+            ProfileModeTemplate[] modes =
+                { CompatibilityModeTemplate, EcoModeTemplate };
+            profiles.AddRange(CreateAppa044Profiles(
+                MacBookPro161Appa044EcoModesProfileId,
+                MacBookPro161Appa044Faf4EcoModesProfileId,
+                MacBookPro161Appa0444b2eEcoModesProfileId,
+                modes));
+            profiles.Add(CreateAppa044Profile(
+                MacBookPro161Appa044235fEcoModesProfileId,
+                "MacBook Pro 16-inch 2019 / APPA044 235FB43D",
+                "235FB43D444EEB6055EED98766FBA83F751998DA3F53068F06A2949744AB1EFF",
+                "AMD Radeon Pro 5300M",
+                "30.0.13045.22003",
+                true,
+                modes));
+            return profiles.AsReadOnly();
         }
 
         private static ReadOnlyCollection<DisplayProfile> CreateAppa044Profiles(
