@@ -153,8 +153,8 @@ namespace MacBookEco.Core
         // Historical app-owned profiles remain compiled only so existing
         // journals can still be verified and safely restored after an update.
         // New installs never select them.
-        private static readonly ReadOnlyCollection<DisplayProfile> LegacyProfiles =
-            CreateLegacyProfiles();
+        private static readonly ReadOnlyCollection<DisplayProfile>
+            HistoricalRecoveryProfiles = CreateHistoricalRecoveryProfiles();
 
         public static ReadOnlyCollection<DisplayProfile> All => Profiles;
 
@@ -233,7 +233,7 @@ namespace MacBookEco.Core
         }
 
         private static ReadOnlyCollection<DisplayProfile>
-            CreateLegacyAppa044Profiles(
+            CreateHistoricalRecoveryAppa044Profiles(
             string primaryProfileId,
             string alternateProfileId,
             string radeon5500ProfileId,
@@ -269,15 +269,16 @@ namespace MacBookEco.Core
                 });
         }
 
-        private static ReadOnlyCollection<DisplayProfile> CreateLegacyProfiles()
+        private static ReadOnlyCollection<DisplayProfile>
+            CreateHistoricalRecoveryProfiles()
         {
             var profiles = new List<DisplayProfile>();
-            profiles.AddRange(CreateLegacyAppa044Profiles(
+            profiles.AddRange(CreateHistoricalRecoveryAppa044Profiles(
                 LegacyMacBookPro161Appa044EcoModesProfileId,
                 LegacyMacBookPro161Appa044Faf4EcoModesProfileId,
                 LegacyMacBookPro161Appa0444b2eEcoModesProfileId,
                 new[] { CompatibilityModeTemplate, LegacyEcoModeTemplate }));
-            profiles.AddRange(CreateLegacyAppa044Profiles(
+            profiles.AddRange(CreateHistoricalRecoveryAppa044Profiles(
                 MacBookPro161Appa044ProfileId,
                 MacBookPro161Appa044Faf4ProfileId,
                 MacBookPro161Appa0444b2eProfileId,
@@ -354,7 +355,7 @@ namespace MacBookEco.Core
                 return profile;
             }
 
-            return FindById(LegacyProfiles, profileId);
+            return FindById(HistoricalRecoveryProfiles, profileId);
         }
 
         public static bool HasAllOwnedModes(DisplayProfile profile)
@@ -405,7 +406,7 @@ namespace MacBookEco.Core
                 currentOverride,
                 refreshRateHz);
             return profile ?? FindExactInstalledProfile(
-                LegacyProfiles,
+                HistoricalRecoveryProfiles,
                 hardware,
                 currentOverride,
                 refreshRateHz);
