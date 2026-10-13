@@ -59,6 +59,18 @@ namespace MacBookEco.Tests.Core
             "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 10 " +
             "00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 EB";
 
+        // Public sanitized APPA044 fixture from issue #19. Its only normalized
+        // difference from the primary fixture is byte 26 (91 instead of B1).
+        private const string ReviewedAppa044Ae80Edid =
+            "00 FF FF FF FF FF FF 00 06 10 44 A0 00 00 00 00 " +
+            "00 00 01 04 B5 22 16 78 02 0F 91 AE 52 43 B0 26 " +
+            "0D 50 54 00 00 00 01 01 01 01 01 01 01 01 01 01 " +
+            "01 01 01 01 01 01 E7 91 00 50 C0 80 37 70 08 20 " +
+            "98 08 59 D7 10 00 00 1A 00 00 00 00 00 00 00 00 " +
+            "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 " +
+            "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 " +
+            "00 00 00 00 00 00 00 00 00 00 00 00 00 00 01 54";
+
         private const string Exact48Dtd =
             "DC 91 00 50 C0 80 24 72 08 20 98 08 59 D7 10 00 00 1A";
 
@@ -107,6 +119,12 @@ namespace MacBookEco.Tests.Core
                 Test(
                     "Radeon Pro 5500M APPA044 EDID selects its exact profile",
                     Radeon5500Appa044ProfileMatches),
+                Test(
+                    "AE80F34E APPA044 selects its profile with a driver warning",
+                    Ae80Appa044ProfileMatches),
+                Test(
+                    "AE80F34E APPA044 still rejects an unreviewed EDID",
+                    Ae80Appa044UnknownVariantRejected),
                 Test("Unknown hardware and unknown layout are rejected", UnknownProfileRejected),
                 Test("Occupied descriptor layout refuses insertion", OccupiedLayoutRejected),
                 Test("Hardware support is distinct from install readiness", CapabilitySplit),
@@ -596,6 +614,70 @@ namespace MacBookEco.Tests.Core
             Check.True(installed.ContainsDetailedTiming(
                 selected.Profile.GetTargetMode(59).Timing));
             Check.True(selected.Profile.GetTargetMode(59).Experimental);
+        }
+
+        private static void Ae80Appa044ProfileMatches()
+        {
+            EdidBaseBlock edid = EdidBaseBlock.ParseHex(ReviewedAppa044Ae80Edid);
+            var hardware = new HardwareSnapshot(
+                "Apple Inc.",
+                "MacBookPro16,1",
+                true,
+                "APPA044",
+                edid,
+                "AMD Radeon Pro 5300M",
+                "PCI\\VEN_1002&DEV_7340",
+                "32.0.12019.1028");
+            ProfileSelectionResult selected = ProfileCatalog.Select(hardware);
+
+            Check.True(selected.HardwareSupported);
+            Check.True(selected.CanInstall);
+            Check.NotNull(selected.Profile);
+            Check.Equal(
+                ProfileCatalog.MacBookPro161Appa044Ae80EcoModesProfileId,
+                selected.Profile.Id);
+            Check.Equal(
+                Sha256Digest.ParseCanonical(
+                    "AE80F34E61DF49EA7A6FFD30520C2B1C9"
+                    + "C68C3CCF8FC629C2A4A0DAE36A28E7C"),
+                edid.NormalizedSignature);
+            Check.Equal(0, selected.ClosestMatch.RejectionReasons.Count);
+            Check.Equal(1, selected.ClosestMatch.Warnings.Count);
+            Check.Equal("30.0.13045.22003", selected.Profile.VerifiedDriverVersion);
+
+            EdidBaseBlock installed = selected.Profile.BuildOverride(hardware);
+            Check.True(EdidBaseBlock.HasValidChecksum(installed.ToByteArray()));
+            Check.Equal(edid.NormalizedSignature, installed.NormalizedSignature);
+            Check.BytesEqual(
+                edid.PreferredTiming.ToByteArray(),
+                installed.PreferredTiming.ToByteArray());
+            Check.True(installed.ContainsDetailedTiming(
+                DetailedTiming.ParseHex(Exact48Dtd)));
+            Check.True(installed.ContainsDetailedTiming(
+                DetailedTiming.ParseHex(ExactEco60Dtd)));
+            Check.True(selected.Profile.GetTargetMode(59).Experimental);
+            Check.Equal(
+                selected.Profile,
+                ProfileCatalog.FindExactInstalledProfile(
+                    hardware,
+                    installed.ToByteArray(),
+                    59));
+        }
+
+        private static void Ae80Appa044UnknownVariantRejected()
+        {
+            byte[] bytes = EdidBaseBlock.ParseHex(
+                ReviewedAppa044Ae80Edid).ToByteArray();
+            bytes[26] = 0x92;
+            EdidBaseBlock.UpdateChecksum(bytes);
+            HardwareSnapshot hardware = CreateKnownHardware(new EdidBaseBlock(bytes));
+
+            Check.False(ProfileCatalog.Select(hardware).HardwareSupported);
+            DisplayProfile profile = ProfileCatalog.GetById(
+                ProfileCatalog.MacBookPro161Appa044Ae80EcoModesProfileId);
+            Check.False(profile.Match(hardware).CanInstall);
+            Check.Throws<InvalidOperationException>(
+                delegate { profile.BuildOverride(hardware); });
         }
 
         private static void LegacyProfileRemainsRecoveryOnly()
