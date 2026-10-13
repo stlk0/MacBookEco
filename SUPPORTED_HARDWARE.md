@@ -13,6 +13,7 @@ exactly. Other systems remain diagnostic-only.
 | Radeon Pro 5300M alternate EDID (`FAF4A9C1`) | `FAF4A9C16A6B394896D75DAA3280D84A61744EA07ED2F7CC21E6CFBCF1B4D2DF` |
 | Radeon Pro 5300M alternate EDID (`235FB43D`) | `235FB43D444EEB6055EED98766FBA83F751998DA3F53068F06A2949744AB1EFF` |
 | Radeon Pro 5500M normalized EDID | `4B2EA0633F9C80C074E8F06E891B5F179444E0A417CD60AFBD190C732840B7EC` |
+| APPA044 alternate EDID (`AE80F34E`, issue #19) | `AE80F34E61DF49EA7A6FFD30520C2B1C9C68C3CCF8FC629C2A4A0DAE36A28E7C` |
 | Native mode | `3072x1920 @ 60 Hz` |
 | GPU | AMD Radeon Pro 5300M or 5500M (`VEN_1002&DEV_7340`) |
 | Tested Radeon Pro 5300M driver | `30.0.13045.22003` |
@@ -30,6 +31,10 @@ The 60 Hz Eco mode is hardware-verified for the primary Radeon Pro 5300M profile
 (`CDA0...F3F5`). It is selectable but marked experimental for the alternate
 5300M and 5500M profiles. Every transition retains exact CCD signal read-back,
 confirmation, and watchdog rollback.
+
+The `AE80F34E` variant uses the same reviewed timings and keeps 60 Hz Eco
+experimental. Its reported driver, `32.0.12019.1028`, has not been hardware-verified;
+the warning against the existing `30.0.13045.22003` reference remains.
 
 Public diagnostics include a sanitized base-block fixture for proposing another
 profile. Per-unit values and secondary descriptors are removed, the checksum is

@@ -29,6 +29,9 @@ namespace MacBookEco.Core
         public const string MacBookPro161Appa044235fEcoModesProfileId =
             "macbookpro16-1-appa044-235fb43d-48-60eco-v3";
 
+        public const string MacBookPro161Appa044Ae80EcoModesProfileId =
+            "macbookpro16-1-appa044-ae80f34e-48-60eco-v3";
+
         private const string LegacyMacBookPro161Appa044EcoModesProfileId =
             "macbookpro16-1-appa044-48-58hz-v2";
 
@@ -144,6 +147,14 @@ namespace MacBookEco.Core
                         MacBookPro161Appa044235fEcoModesProfileId,
                         "MacBook Pro 16-inch 2019 / APPA044 235FB43D",
                         "235FB43D444EEB6055EED98766FBA83F751998DA3F53068F06A2949744AB1EFF",
+                        "AMD Radeon Pro 5300M",
+                        "30.0.13045.22003",
+                        true,
+                        new[] { CompatibilityModeTemplate, EcoModeTemplate }),
+                    CreateAppa044Profile(
+                        MacBookPro161Appa044Ae80EcoModesProfileId,
+                        "MacBook Pro 16-inch 2019 / APPA044 AE80F34E",
+                        "AE80F34E61DF49EA7A6FFD30520C2B1C9C68C3CCF8FC629C2A4A0DAE36A28E7C",
                         "AMD Radeon Pro 5300M",
                         "30.0.13045.22003",
                         true,
